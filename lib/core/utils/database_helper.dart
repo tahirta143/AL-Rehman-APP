@@ -1,3 +1,4 @@
+
 import 'dart:async';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
@@ -20,7 +21,7 @@ class DatabaseHelper {
     String path = join(await getDatabasesPath(), 'hims_offline.db');
     return await openDatabase(
       path,
-      version: 7,
+      version: 13,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -130,6 +131,68 @@ class DatabaseHelper {
         await db.execute('ALTER TABLE visits_local ADD COLUMN mr_number TEXT');
       } catch (e) {}
     }
+
+    if (oldVersion < 8) {
+      try {
+        await db.execute('ALTER TABLE camp_config ADD COLUMN mr_prefix TEXT');
+        await db.execute('ALTER TABLE camp_config ADD COLUMN mr_sequence INTEGER DEFAULT 0');
+      } catch (e) {}
+    }
+
+    if (oldVersion < 11) {
+      // Add missing patient columns
+      final patientCols = [
+        'relation TEXT',
+        'dob TEXT',
+        'age INTEGER',
+        'profession TEXT',
+        'education TEXT',
+        'whatsapp TEXT',
+        'email TEXT',
+        'cnic TEXT'
+      ];
+      for (var col in patientCols) {
+        try {
+          await db.execute('ALTER TABLE patients_local ADD COLUMN $col');
+        } catch (e) {}
+      }
+
+      // Add missing vitals columns
+      final vitalCols = [
+        'height REAL',
+        'bmi REAL',
+        'bmr REAL',
+        'spo2 REAL',
+        'waist REAL',
+        'hip REAL',
+        'whr REAL',
+        'pain_scale INTEGER'
+      ];
+      for (var col in vitalCols) {
+        try {
+          await db.execute('ALTER TABLE vitals_local ADD COLUMN $col');
+        } catch (e) {}
+      }
+    }
+
+    if (oldVersion < 12) {
+      final tables = ['patients_local', 'visits_local', 'vitals_local', 'prescriptions_local', 'appointments_local'];
+      for (var table in tables) {
+        try {
+          await db.execute('ALTER TABLE $table ADD COLUMN last_sync_attempt_at TEXT');
+        } catch (e) {}
+        try {
+          await db.execute('ALTER TABLE $table ADD COLUMN last_error TEXT');
+        } catch (e) {}
+      }
+    }
+
+    if (oldVersion < 13) {
+      try {
+        await db.execute('ALTER TABLE vitals_local ADD COLUMN height_unit TEXT DEFAULT "in"');
+        await db.execute('ALTER TABLE vitals_local ADD COLUMN bp_reading_type TEXT DEFAULT "regular"');
+      } catch (e) {}
+    }
   }
 
   Future _onCreate(Database db, int version) async {
@@ -143,6 +206,8 @@ class DatabaseHelper {
         camp_id INTEGER,
         device_id TEXT,
         device_token TEXT,
+        mr_prefix TEXT,
+        mr_sequence INTEGER DEFAULT 0,
         last_bootstrap_at TEXT,
         last_sync_at TEXT
       )
@@ -202,11 +267,19 @@ class DatabaseHelper {
         first_name TEXT,
         last_name TEXT,
         guardian_name TEXT,
+        relation TEXT,
         gender TEXT,
+        dob TEXT,
+        age INTEGER,
+        blood_group TEXT,
+        profession TEXT,
+        education TEXT,
         phone TEXT,
+        whatsapp TEXT,
+        email TEXT,
+        cnic TEXT,
         address TEXT,
         city TEXT,
-        blood_group TEXT,
         sync_status TEXT,
         last_sync_attempt_at TEXT,
         last_error TEXT,
@@ -244,8 +317,18 @@ class DatabaseHelper {
         diastolic REAL,
         pulse REAL,
         weight REAL,
+        height REAL,
+        height_unit TEXT,
         temp REAL,
+        spo2 REAL,
+        bmi REAL,
+        bmr REAL,
+        waist REAL,
+        hip REAL,
+        whr REAL,
+        pain_scale INTEGER,
         mr_number TEXT,
+        bp_reading_type TEXT,
         sync_status TEXT,
         last_sync_attempt_at TEXT,
         last_error TEXT,
@@ -265,6 +348,7 @@ class DatabaseHelper {
         mr_number TEXT,
         sync_status TEXT,
         last_sync_attempt_at TEXT,
+        last_error TEXT,
         created_at TEXT
       )
     ''');

@@ -22,6 +22,7 @@ import '../cunsultations/cunsultations.dart';
 import '../cunsultations/widgets/appointment_dialog.dart';
 import '../emergency_treatment/emergency_treatment.dart';
 import '../mr_details/mr_view/mr_view.dart';
+import 'offline_dashboard.dart';
 
 const Color _teal = Color(0xFF00B5AD);
 
@@ -584,20 +585,22 @@ class _DashboardBodyState extends State<_DashboardBody> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // const Text(
-                            //   'Hims Dashboard',
-                            //   style: TextStyle(
-                            //     fontSize: 24,
-                            //     fontWeight: FontWeight.bold,
-                            //     letterSpacing: -0.5,
-                            //   ),
-                            // ),
                             Text(
                               _dateFormat.format(dashboardProv.selectedDate),
                               style: TextStyle(
                                   color: Colors.grey.shade500, fontSize: 13),
                             ),
                           ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.offline_pin_rounded, color: _teal),
+                        onPressed: () => Navigator.pushReplacement(
+                          context,
+                          PageRouteBuilder(
+                            pageBuilder: (context, _, __) => const OfflineDashboardScreen(),
+                            transitionDuration: Duration.zero,
+                          ),
                         ),
                       ),
                     ],

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../core/services/connectivity_service.dart';
 import '../../custum widgets/drawer/base_scaffold.dart';
 import '../../models/mr_model/mr_patient_model.dart';
 import '../../providers/mr_provider/mr_provider.dart';
@@ -182,10 +183,20 @@ class _MrDetailsBodyState extends State<_MrDetailsBody>
       });
       prov.removeListener(_onProvChange);
     }
+    // Listen for connectivity changes to refresh patient data if we go online
+    ConnectivityService().isOnline.addListener(_onConnectivityChange);
+  }
+
+  void _onConnectivityChange() {
+    if (mounted && ConnectivityService().isOnline.value && _patient != null) {
+      debugPrint('🌐 App back online, refreshing patient data from server...');
+      _lookupMr(_patient!.mrNumber);
+    }
   }
 
   @override
   void dispose() {
+    ConnectivityService().isOnline.removeListener(_onConnectivityChange);
     _debounce?.cancel();
     _tabController.dispose();
     _mrFocusNode.dispose();
@@ -212,7 +223,8 @@ class _MrDetailsBodyState extends State<_MrDetailsBody>
 
   // ── Logic ──────────────────────────────────────────────────────────────────
   Future<void> _lookupMr(String value, {bool normalize = false}) async {
-    final input = value.trim().replaceAll(RegExp(r'[^0-9]'), '');
+    // Allow alphanumeric and hyphens
+    final input = value.trim().toUpperCase(); 
     if (input.isEmpty) {
       _clearPatient();
       return;
@@ -268,9 +280,9 @@ class _MrDetailsBodyState extends State<_MrDetailsBody>
       _isSearching = false;
     });
 
-    // Automatically fetch and fill next MR when clearing
-    prov.fetchNextMR().then((_) {
-      if (mounted && _mrCtrl.text.isEmpty) {
+    // Wait a brief moment to ensure MrProvider has finished updating the next number
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (mounted && _mrCtrl.text.isEmpty && _isNewPatient) {
         setState(() {
           if (prov.nextMrNumber != null) {
             _mrCtrl.text = prov.nextMrNumber!;
@@ -563,7 +575,7 @@ class _MrDetailsBodyState extends State<_MrDetailsBody>
           child: TextField(
             controller: _mrCtrl,
             focusNode: _mrFocusNode,
-            keyboardType: TextInputType.number,
+            keyboardType: TextInputType.text,
             style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w700,

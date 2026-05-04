@@ -58,7 +58,7 @@ class _VitalsScreenState extends State<VitalsScreen> {
             // ── Main Dashboard Area ──────────────────────────────────────────
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 100),
                 child: Column(
                   children: [
                     if (!isTablet) _MobileConsultationBar(provider: provider),
@@ -253,7 +253,17 @@ class _VitalsForm extends StatelessWidget {
             icon: Icons.monitor_weight_outlined,
             children: [
               _VitalCard(label: 'Weight', unit: 'Kgs', controller: provider.controllers['weight']!, icon: Icons.scale_rounded),
-              _VitalCard(label: 'Height', unit: 'Inches', controller: provider.controllers['height']!, icon: Icons.height_rounded),
+              _VitalCard(
+                label: 'Height', 
+                unit: provider.heightUnit == 'in' ? 'Inches' : 'cm', 
+                controller: provider.controllers['height']!, 
+                icon: Icons.height_rounded,
+                trailing: _UnitToggle(
+                  value: provider.heightUnit,
+                  onChanged: (val) => provider.setHeightUnit(val),
+                  options: const ['in', 'cm'],
+                ),
+              ),
               _VitalComputedCard(label: 'BMI', unit: _getBmiStatus(provider.bmi).label, value: provider.bmi, icon: Icons.speed_rounded, statusColor: _getBmiStatus(provider.bmi).color),
               _VitalComputedCard(label: 'BMR', unit: 'kcal/day', value: provider.bmr, icon: Icons.bolt_rounded, statusColor: kTeal),
               _VitalCard(label: 'Waist', unit: 'cm', controller: provider.controllers['waist']!, icon: Icons.straighten_rounded),
@@ -265,6 +275,11 @@ class _VitalsForm extends StatelessWidget {
           _VitalGroup(
             title: 'VITAL SIGNS',
             icon: Icons.favorite_border_rounded,
+            headerTrailing: _UnitToggle(
+              value: provider.bpReadingType,
+              onChanged: (val) => provider.setBpReadingType(val),
+              options: const ['regular', 'fasting'],
+            ),
             children: [
               _VitalCard(label: 'Systolic', unit: 'mmHg', controller: provider.controllers['systolic']!, icon: Icons.favorite_rounded),
               _VitalCard(label: 'Diastolic', unit: 'mmHg', controller: provider.controllers['diastolic']!, icon: Icons.favorite_outline_rounded),
@@ -321,7 +336,8 @@ class _VitalGroup extends StatelessWidget {
   final String title;
   final IconData icon;
   final List<Widget> children;
-  const _VitalGroup({required this.title, required this.icon, required this.children});
+  final Widget? headerTrailing;
+  const _VitalGroup({required this.title, required this.icon, required this.children, this.headerTrailing});
 
   @override
   Widget build(BuildContext context) {
@@ -336,7 +352,8 @@ class _VitalGroup extends StatelessWidget {
             children: [
               Icon(icon, size: 16, color: kTeal),
               const SizedBox(width: 8),
-              Text(title, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: kTextMid, letterSpacing: 1)),
+              Expanded(child: Text(title, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: kTextMid, letterSpacing: 1))),
+              if (headerTrailing != null) headerTrailing!,
             ],
           ),
           const SizedBox(height: 12),
@@ -364,8 +381,9 @@ class _VitalCard extends StatelessWidget {
   final String unit;
   final TextEditingController controller;
   final IconData icon;
+  final Widget? trailing;
 
-  const _VitalCard({required this.label, required this.unit, required this.controller, required this.icon});
+  const _VitalCard({required this.label, required this.unit, required this.controller, required this.icon, this.trailing});
 
   @override
   Widget build(BuildContext context) {
@@ -376,12 +394,24 @@ class _VitalCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(icon, size: 10, color: kTeal),
-              const SizedBox(width: 4),
-              Expanded(child: Text(label.toUpperCase(), style: const TextStyle(fontSize: 8.5, fontWeight: FontWeight.bold, color: kTextMid, letterSpacing: 0.5))),
-            ],
+          SizedBox(
+            height: 22,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, size: 10, color: kTeal),
+                  const SizedBox(width: 4),
+                  Text(label.toUpperCase(), style: const TextStyle(fontSize: 8.5, fontWeight: FontWeight.bold, color: kTextMid, letterSpacing: 0.5)),
+                  if (trailing != null) ...[
+                    const SizedBox(width: 8),
+                    trailing!,
+                  ],
+                ],
+              ),
+            ),
           ),
           const Spacer(),
           TextField(
@@ -703,6 +733,53 @@ class _NoPatientSelected extends StatelessWidget {
           const SizedBox(height: 4),
           const Text('To start recording vital signs', style: TextStyle(color: kTextMuted, fontSize: 11)),
         ],
+      ),
+    );
+  }
+}
+
+// ─── Unit Toggle Widget ──────────────────────────────────────────────────
+class _UnitToggle extends StatelessWidget {
+  final String value;
+  final Function(String) onChanged;
+  final List<String> options;
+
+  const _UnitToggle({required this.value, required this.onChanged, required this.options});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 22,
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        color: kTealLight,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: kTealBorder),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: options.map((opt) {
+          final isSel = value == opt;
+          return GestureDetector(
+            onTap: () => onChanged(opt),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5),
+              decoration: BoxDecoration(
+                color: isSel ? kTeal : Colors.transparent,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                opt.toUpperCase(),
+                style: TextStyle(
+                  fontSize: 8,
+                  fontWeight: FontWeight.w900,
+                  color: isSel ? kWhite : kTeal,
+                ),
+              ),
+            ),
+          );
+        }).toList(),
       ),
     );
   }

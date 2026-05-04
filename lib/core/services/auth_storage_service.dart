@@ -92,4 +92,8 @@ class AuthStorageService {
       print('🔒 AuthStorage Clear Error: $e');
     }
   }
+
+  Future<void> clearCampToken() async {
+    await _storage.delete(key: _keyCampToken);
+  }
 }

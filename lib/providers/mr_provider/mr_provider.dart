@@ -10,6 +10,14 @@ class MrProvider extends ChangeNotifier {
   final ConnectivityService _connectivity = ConnectivityService();
   final CampSyncService _syncService = CampSyncService();
   final DatabaseHelper _db = DatabaseHelper();
+  bool _disposed = false;
+
+  @override
+  void notifyListeners() {
+    if (!_disposed) {
+      super.notifyListeners();
+    }
+  }
 
   // ── Pagination State ──
   static const int _pageSize = 50;
@@ -43,6 +51,20 @@ class MrProvider extends ChangeNotifier {
   MrProvider() {
     loadPatients();
     fetchNextMR();
+    
+    // Listen for connectivity changes to update next MR number
+    _connectivity.isOnline.addListener(_onConnectivityChanged);
+  }
+
+  void _onConnectivityChanged() {
+    fetchNextMR();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _connectivity.isOnline.removeListener(_onConnectivityChanged);
+    super.dispose();
   }
 
   // ── Filtered patients list (local search fallback) ──
@@ -134,7 +156,8 @@ class MrProvider extends ChangeNotifier {
   // ── Fetch Next MR Number ──
   Future<void> fetchNextMR() async {
     if (!_connectivity.isOnline.value) {
-      _nextMrNumber = 'OFF-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+      final localNext = await _syncService.peekNextMrNumberLocal();
+      _nextMrNumber = localNext ?? 'PENDING';
       notifyListeners();
       return;
     }
@@ -147,7 +170,8 @@ class MrProvider extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('⚠️ fetchNextMR failed: $e');
-      _nextMrNumber = 'OFF-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+      final localNext = await _syncService.peekNextMrNumberLocal();
+      _nextMrNumber = localNext ?? 'PENDING';
       notifyListeners();
     }
   }
@@ -205,50 +229,49 @@ class MrProvider extends ChangeNotifier {
     if (trimmed.isEmpty) return null;
 
     final searchInput = normalize ? _normalizeMrNumber(trimmed) : trimmed;
+    PatientModel? localMatch;
 
-    if (!_connectivity.isOnline.value) {
-      debugPrint('📴 App is OFFLINE. Searching patient in local DB.');
-      final localPatient = await _db.queryPending('patients_local');
-      final match = localPatient.firstWhere(
+    // 1. Always check Local first (helps with unsynced patients)
+    try {
+      final localRows = await _db.queryAll('patients_local');
+      final match = localRows.firstWhere(
         (p) => p['mr_number'] == searchInput,
         orElse: () => {},
       );
       if (match.isNotEmpty) {
-        return PatientModel(
-          mrNumber: match['mr_number'],
-          firstName: match['first_name'],
-          lastName: match['last_name'],
-          guardianName: match['guardian_name'],
-          gender: match['gender'],
-          phoneNumber: match['phone'],
-          address: match['address'],
-          city: match['city'],
-          bloodGroup: match['blood_group'],
-          registeredAt: DateTime.parse(match['created_at']),
-        );
+        localMatch = PatientModel.fromLocalMap(match);
       }
-      return null;
+    } catch (e) {
+      debugPrint('⚠️ Local lookup error: $e');
     }
 
-    // ✅ Always fetch from API so we get visit history
-    final result = await _apiService.fetchPatientByMR(searchInput);
-
-    if (result.success && result.patient != null) {
-      final patient = result.patient!.toPatientModel();
-
-      // Update local cache
-      final index =
-      _patients.indexWhere((p) => p.mrNumber == patient.mrNumber);
-      if (index != -1) {
-        _patients[index] = patient;
-      } else {
-        _patients.insert(0, patient);
-      }
-      notifyListeners();
-      return patient;
+    // 2. If Offline, return local match immediately
+    if (!_connectivity.isOnline.value) {
+      return localMatch;
     }
 
-    return null;
+    // 3. If Online, try to fetch from API for latest data/history
+    try {
+      final result = await _apiService.fetchPatientByMR(searchInput).timeout(const Duration(seconds: 10));
+      if (result.success && result.patient != null) {
+        final apiPatient = result.patient!.toPatientModel();
+        
+        // Update local cache for UI lists
+        final index = _patients.indexWhere((p) => p.mrNumber == apiPatient.mrNumber);
+        if (index != -1) {
+          _patients[index] = apiPatient;
+        } else {
+          _patients.insert(0, apiPatient);
+        }
+        notifyListeners();
+        return apiPatient;
+      }
+    } catch (e) {
+      debugPrint('⚠️ API lookup failed: $e');
+    }
+
+    // 4. Final fallback: return local match if API failed or didn't find it
+    return localMatch;
   }
 
   String _normalizeMrNumber(String input) {
@@ -352,20 +375,31 @@ class MrProvider extends ChangeNotifier {
     if (savedLocally) {
       debugPrint('📴 Saving patient locally (Offline/API Failure).');
       try {
-        final uuid = await _syncService.savePatientLocal({
+        final result = await _syncService.savePatientLocal({
           'mr_number': patient.mrNumber,
           'first_name': patient.firstName,
           'last_name': patient.lastName,
           'guardian_name': patient.guardianName,
+          'relation': patient.relation,
           'gender': patient.gender,
+          'dob': patient.dateOfBirth,
+          'age': patient.age,
+          'blood_group': patient.bloodGroup,
+          'profession': patient.profession,
+          'education': patient.education,
           'phone': patient.phoneNumber,
+          'whatsapp': patient.whatsappNo,
+          'email': patient.email,
+          'cnic': patient.cnic,
           'address': patient.address,
           'city': patient.city,
-          'blood_group': patient.bloodGroup,
         });
         
+        final String uuid = result['uuid']!;
+        final String assignedMr = result['mr_number']!;
+        
         createdPatient = PatientModel(
-          mrNumber: patient.mrNumber,
+          mrNumber: assignedMr,
           firstName: patient.firstName,
           lastName: patient.lastName,
           guardianName: patient.guardianName,
@@ -383,7 +417,7 @@ class MrProvider extends ChangeNotifier {
           address: patient.address,
           city: patient.city,
           registeredAt: patient.registeredAt,
-          deviceUuid: uuid, // Capture the local device UUID
+          deviceUuid: uuid,
           syncStatus: 'pending',
         );
         
@@ -399,8 +433,8 @@ class MrProvider extends ChangeNotifier {
 
     _isCreating = false;
     notifyListeners();
-    if (createdPatient != null && _connectivity.isOnline.value) {
-       fetchNextMR();
+    if (createdPatient != null) {
+       await fetchNextMR();
     }
     return createdPatient;
   }

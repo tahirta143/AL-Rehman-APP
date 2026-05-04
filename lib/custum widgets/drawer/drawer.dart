@@ -297,6 +297,13 @@ class _CustomDrawerState extends State<CustomDrawer> {
                     index: 100,
                   ),
 
+                  // Offline Dashboard
+                  _buildDrawerItem(
+                    icon: Icons.offline_pin_rounded,
+                    title: 'Camp Dashboard',
+                    index: 101,
+                  ),
+
                   // ── Prescription Dropdown ──────────────────────────────────
                   if (prescriptionItems.isNotEmpty)
                     _buildGroupHeader(

@@ -47,7 +47,8 @@ class SyncProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _onConnectivityChanged() {
+  void _onConnectivityChanged() async {
+    await _updatePendingCount();
     notifyListeners();
     if (isOnline && _pendingCount > 0) {
       // Auto-sync when back online
@@ -70,6 +71,8 @@ class SyncProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> refreshPendingCount() => _updatePendingCount();
+
   Future<void> syncData() async {
     if (_isSyncing || !isOnline) return;
     
@@ -81,6 +84,10 @@ class SyncProvider extends ChangeNotifier {
       final result = await _syncService.bulkSync();
       if (result['success'] != true) {
         _lastErrorMessage = result['message'];
+        if (result['isCampRemoved'] == true) {
+          await resetCamp();
+          _lastErrorMessage = 'Camp removed from admin. Local session reset.';
+        }
       }
       debugPrint('🔄 Sync Result: ${result['message']}');
     } catch (e) {
@@ -127,6 +134,10 @@ class SyncProvider extends ChangeNotifier {
         notifyListeners();
       } else {
         _lastErrorMessage = result['message'];
+        if (result['isCampRemoved'] == true) {
+          await resetCamp();
+          _lastErrorMessage = 'Camp removed from admin. Local session reset.';
+        }
       }
     } catch (e) {
       _lastErrorMessage = e.toString();
@@ -174,6 +185,23 @@ class SyncProvider extends ChangeNotifier {
     } catch (e) {
       _lastErrorMessage = e.toString();
       return {'success': false, 'message': e.toString()};
+    } finally {
+      _isSyncing = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> resetCamp() async {
+    _isSyncing = true;
+    _lastErrorMessage = null;
+    notifyListeners();
+    try {
+      await _db.clearTable('camp_config');
+      await _syncService.clearCampToken();
+      _isDeviceRegistered = false;
+      _campId = null;
+    } catch (e) {
+      _lastErrorMessage = e.toString();
     } finally {
       _isSyncing = false;
       notifyListeners();

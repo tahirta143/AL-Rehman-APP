@@ -19,6 +19,7 @@ class CampSyncService {
   String generateUuid() => _uuid.v4();
 
   Future<String?> getCampToken() => _storage.getCampToken();
+  Future<void> clearCampToken() => _storage.clearCampToken();
 
   // ─── Helper: build auth headers ───────────────────────────────────
   Future<Map<String, String>> _authHeaders() async {
@@ -117,6 +118,8 @@ class CampSyncService {
           // Update config
           await _db.insert('camp_config', {
             'camp_id': campId,
+            'mr_prefix': payload['camp']['mr_prefix'],
+            'mr_sequence': payload['camp']['mr_sequence'] ?? 0,
             'last_bootstrap_at': DateTime.now().toIso8601String(),
           });
 
@@ -125,6 +128,9 @@ class CampSyncService {
       }
       if (response.statusCode == 401) {
         return {'success': false, 'message': 'Session expired. Please log out and log in again.'};
+      }
+      if (response.statusCode == 404) {
+        return {'success': false, 'message': 'Camp session not found on server.', 'isCampRemoved': true};
       }
       return {'success': false, 'message': 'Failed to fetch master data: ${response.statusCode}'};
     } catch (e) {
@@ -219,14 +225,98 @@ class CampSyncService {
     }
   }
 
+  // ─── Local MR Number Generation ─────────────────────────────────
+  Future<String?> getNextMrNumberLocal() async {
+    try {
+      final db = await _db.database;
+      final config = await db.query('camp_config', limit: 1);
+      if (config.isEmpty) return null;
+
+      final String? prefix = config.first['mr_prefix']?.toString();
+      final int currentSeq = int.tryParse(config.first['mr_sequence']?.toString() ?? '0') ?? 0;
+      
+      if (prefix == null) return null;
+
+      final int nextSeq = currentSeq + 1;
+      
+      // Update local sequence
+      await db.update('camp_config', {'mr_sequence': nextSeq});
+      
+      return '$prefix-$nextSeq';
+    } catch (e) {
+      debugPrint('❌ Local MR generation error: $e');
+      return null;
+    }
+  }
+
+  Future<String?> peekNextMrNumberLocal() async {
+    try {
+      final db = await _db.database;
+      final config = await db.query('camp_config', limit: 1);
+      if (config.isEmpty) return null;
+
+      final String? prefix = config.first['mr_prefix']?.toString();
+      final int currentSeq = int.tryParse(config.first['mr_sequence']?.toString() ?? '0') ?? 0;
+      
+      if (prefix == null) return null;
+
+      final int nextSeq = currentSeq + 1;
+      return '$prefix-$nextSeq';
+    } catch (e) {
+      return null;
+    }
+  }
+
+  Future<void> _updateLocalSequenceFromMr(String mrNumber) async {
+    try {
+      final parts = mrNumber.split('-');
+      if (parts.length != 2) return;
+      
+      final String prefix = parts[0];
+      final int seq = int.tryParse(parts[1]) ?? 0;
+      if (seq == 0) return;
+
+      final db = await _db.database;
+      final config = await db.query('camp_config', limit: 1);
+      if (config.isEmpty) return;
+
+      final String? currentPrefix = config.first['mr_prefix']?.toString();
+      final int currentSeq = int.tryParse(config.first['mr_sequence']?.toString() ?? '0') ?? 0;
+
+      // If prefix matches and the new sequence is higher or equal, update it
+      if (prefix == currentPrefix && seq > currentSeq) {
+        await db.update('camp_config', {'mr_sequence': seq});
+        debugPrint('📈 Updated local sequence to: $seq (from MR: $mrNumber)');
+      }
+    } catch (e) {
+      debugPrint('⚠️ Error updating sequence from MR: $e');
+    }
+  }
+
   // ─── Save Local Records ──────────────────────────────────────────
-  Future<String> savePatientLocal(Map<String, dynamic> patientData) async {
+  Future<Map<String, String>> savePatientLocal(Map<String, dynamic> patientData) async {
     String uuid = _uuid.v4();
     patientData['device_uuid'] = uuid;
     patientData['sync_status'] = 'pending';
     patientData['created_at'] = DateTime.now().toIso8601String();
+    
+    // Auto-generate local MR number if not provided, otherwise ensure sequence is updated
+    if (patientData['mr_number'] == null || patientData['mr_number'] == 'PENDING' || patientData['mr_number'].toString().isEmpty) {
+      final localMr = await getNextMrNumberLocal();
+      if (localMr != null) {
+        patientData['mr_number'] = localMr;
+        debugPrint('🆕 Assigned local MR number: $localMr');
+      }
+    } else {
+      // User provided an MR number (or it was auto-filled), ensure we don't re-use this sequence
+      await _updateLocalSequenceFromMr(patientData['mr_number'].toString());
+    }
+
     await _db.insert('patients_local', patientData);
-    return uuid;
+    return {
+      'uuid': uuid,
+      'mr_number': patientData['mr_number']?.toString() ?? '',
+    };
   }
 
   Future<String> saveVisitLocal(Map<String, dynamic> visitData) async {
@@ -346,7 +436,7 @@ class CampSyncService {
         Uri.parse(url),
         headers: headers,
         body: jsonEncode(payload),
-      ).timeout(const Duration(seconds: 60));
+      ).timeout(const Duration(seconds: 120));
 
       debugPrint('📥 Sync Response [${response.statusCode}]');
       if (response.statusCode != 200 && response.statusCode != 201) {
@@ -361,8 +451,57 @@ class CampSyncService {
           final errors = result['errors'] as List?;
 
           // Update statuses based on result
-          // For simplicity, we mark all successfully sent items as synced
-          // In a real app, we'd iterate mappings/errors as per guide
+          // ─── Process Mappings ───
+          if (mappings != null) {
+            for (var mapping in mappings) {
+              final String entity = mapping['entity'];
+              final String deviceUuid = mapping['device_uuid'];
+              final String? mrNumber = mapping['mr_number'];
+              
+              if (entity == 'patient' && mrNumber != null) {
+                // Update the patient's MR number locally
+                await (await _db.database).update(
+                  'patients_local',
+                  {'mr_number': mrNumber, 'sync_status': 'synced'},
+                  where: 'device_uuid = ?',
+                  whereArgs: [deviceUuid],
+                );
+                
+                // Also update related records that might be waiting for this MR number
+                await (await _db.database).update(
+                  'visits_local',
+                  {'mr_number': mrNumber},
+                  where: 'patient_uuid = ? AND (mr_number = "PENDING" OR mr_number IS NULL)',
+                  whereArgs: [deviceUuid],
+                );
+                await (await _db.database).update(
+                  'vitals_local',
+                  {'mr_number': mrNumber},
+                  where: 'patient_uuid = ? AND (mr_number = "PENDING" OR mr_number IS NULL)',
+                  whereArgs: [deviceUuid],
+                );
+                await (await _db.database).update(
+                  'prescriptions_local',
+                  {'mr_number': mrNumber},
+                  where: 'patient_uuid = ? AND (mr_number = "PENDING" OR mr_number IS NULL)',
+                  whereArgs: [deviceUuid],
+                );
+                debugPrint('✅ Updated local MR number to $mrNumber for $deviceUuid');
+              } else {
+                // Generic sync status update for other entities
+                String table = '';
+                if (entity == 'visit') table = 'visits_local';
+                else if (entity == 'vital') table = 'vitals_local';
+                else if (entity == 'prescription') table = 'prescriptions_local';
+                
+                if (table.isNotEmpty) {
+                  await _db.updateSyncStatus(table, deviceUuid, 'synced');
+                }
+              }
+            }
+          }
+
+          // Fallback: mark remaining as synced if not already handled by mappings
           for (var p in patients) {
             await _db.updateSyncStatus('patients_local', p['device_uuid'], 'synced');
           }
@@ -389,6 +528,9 @@ class CampSyncService {
       }
       if (response.statusCode == 401) {
         return {'success': false, 'message': 'Session expired. Please log out and log in again.'};
+      }
+      if (response.statusCode == 404) {
+        return {'success': false, 'message': 'Camp session not found on server.', 'isCampRemoved': true};
       }
       return {'success': false, 'message': 'Sync failed: ${response.statusCode}'};
     } catch (e) {

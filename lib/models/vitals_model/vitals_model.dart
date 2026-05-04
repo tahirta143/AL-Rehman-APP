@@ -15,8 +15,10 @@ class VitalsModel {
   final double? waist;
   final double? hip;
   final double? whr;
-  final int painScale;
+  final String? heightUnit;
+  final String? bpReadingType;
   final DateTime? createdAt;
+  final int? painScale;
 
   VitalsModel({
     this.id,
@@ -24,11 +26,13 @@ class VitalsModel {
     this.receiptId,
     this.weight,
     this.height,
+    this.heightUnit = 'in',
     this.bsr,
     this.bmi,
     this.bmr,
     this.systolic,
     this.diastolic,
+    this.bpReadingType = 'regular',
     this.pulse,
     this.spo2,
     this.temperature,
@@ -58,11 +62,13 @@ class VitalsModel {
       receiptId: json['receipt_id']?.toString(),
       weight: parseDouble(json['weight']),
       height: parseDouble(json['height']),
+      heightUnit: json['height_unit']?.toString() ?? 'in',
       bsr: parseDouble(json['bsr']),
       bmi: parseDouble(json['bmi']),
       bmr: parseDouble(json['bmr']),
       systolic: parseInt(json['systolic']),
       diastolic: parseInt(json['diastolic']),
+      bpReadingType: json['bp_reading_type']?.toString() ?? 'regular',
       pulse: parseInt(json['pulse']),
       spo2: parseDouble(json['spo2']),
       temperature: parseDouble(json['temperature']),
@@ -80,11 +86,13 @@ class VitalsModel {
       'receipt_id': receiptId,
       'weight': weight,
       'height': height,
+      'height_unit': heightUnit,
       'bsr': bsr,
       'bmi': bmi,
       'bmr': bmr,
       'systolic': systolic,
       'diastolic': diastolic,
+      'bp_reading_type': bpReadingType,
       'pulse': pulse,
       'spo2': spo2,
       'temperature': temperature,

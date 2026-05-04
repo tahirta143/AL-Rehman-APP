@@ -13,6 +13,7 @@ import 'package:hims_app/screens/consultation_payments/consultation_payments.dar
 import 'package:hims_app/screens/shift_management/shift_management.dart';
 import '../../screens/add_expenses/add_expenses.dart';
 import '../../screens/dashboard/dashboard.dart';
+import '../../screens/dashboard/offline_dashboard.dart';
 import '../../custum widgets/bottombar/bottombar.dart';
 import '../../core/providers/permission_provider.dart';
 import '../../core/utils/date_formatter.dart';
@@ -234,7 +235,7 @@ class _BaseScaffoldState extends State<BaseScaffold> {
                 builder: (context, perm, child) {
                   final name = perm.fullName ?? 'User';
                   return Text(
-                    'Good morning, $name 👋',
+                    'Good morning, $name',
                     style: TextStyle(
                       color: Colors.white.withOpacity(0.85),
                       fontSize: 13,
@@ -317,6 +318,9 @@ class _BaseScaffoldState extends State<BaseScaffold> {
         break;
       case 100:
         screen = const SyncDashboardScreen();
+        break;
+      case 101:
+        screen = const OfflineDashboardScreen();
         break;
       case -1:
         _showLogoutDialog(context);

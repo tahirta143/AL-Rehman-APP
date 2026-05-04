@@ -249,6 +249,11 @@ class _SyncDashboardBodyState extends State<_SyncDashboardBody> {
                   icon: const Icon(Icons.add_circle_outline, size: 18),
                   label: const Text('New', style: TextStyle(fontSize: 12)),
                 ),
+                TextButton.icon(
+                  onPressed: () => _showResetDialog(context, prov),
+                  icon: const Icon(Icons.restart_alt_rounded, size: 18, color: Colors.red),
+                  label: const Text('Reset', style: TextStyle(fontSize: 12, color: Colors.red)),
+                ),
               ],
             ),
             const SizedBox(height: 12),
@@ -283,58 +288,63 @@ class _SyncDashboardBodyState extends State<_SyncDashboardBody> {
               ],
             ),
             const Divider(height: 32),
-          ],
-          const Text(
-            'Download doctors, services, and medicines for offline use.',
-            style: TextStyle(fontSize: 13, color: Color(0xFF475569)),
-          ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _campIdCtrl,
-                  enabled: prov.isDeviceRegistered,
-                  decoration: InputDecoration(
-                    labelText: 'Camp UUID',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    prefixIcon: const Icon(Icons.pin_drop_rounded),
+          ] else ...[
+            const Text(
+              'Download doctors, services, and medicines for offline use.',
+              style: TextStyle(fontSize: 13, color: Color(0xFF475569)),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _campIdCtrl,
+                    enabled: prov.isDeviceRegistered,
+                    decoration: InputDecoration(
+                      labelText: 'Camp UUID',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      prefixIcon: const Icon(Icons.pin_drop_rounded),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 16),
-              ElevatedButton(
-                onPressed: (isOnline && !prov.isSyncing && prov.isDeviceRegistered)
-                  ? () async {
-                      await prov.bootstrap(_campIdCtrl.text);
-                      final error = prov.lastErrorMessage;
-                      _scaffoldKey.currentState?.hideCurrentSnackBar();
-                      if (error != null) {
-                        _scaffoldKey.currentState?.showSnackBar(SnackBar(content: Text(error), backgroundColor: Colors.red));
-                      } else {
-                        _scaffoldKey.currentState?.showSnackBar(const SnackBar(content: Text('Bootstrap success!'), backgroundColor: Colors.green));
+                const SizedBox(width: 16),
+                ElevatedButton(
+                  onPressed: (isOnline && !prov.isSyncing && prov.isDeviceRegistered)
+                    ? () async {
+                        await prov.bootstrap(_campIdCtrl.text);
+                        final error = prov.lastErrorMessage;
+                        _scaffoldKey.currentState?.hideCurrentSnackBar();
+                        if (error != null) {
+                          _scaffoldKey.currentState?.showSnackBar(SnackBar(content: Text(error), backgroundColor: Colors.red));
+                        } else {
+                          _scaffoldKey.currentState?.showSnackBar(const SnackBar(content: Text('Bootstrap success!'), backgroundColor: Colors.green));
+                        }
                       }
-                    }
-                  : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF00B5AD),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF00B5AD),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: prov.isSyncing 
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Text('Bootstrap'),
                 ),
-                child: prov.isSyncing 
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('Bootstrap'),
-              ),
-            ],
-          ),
-          if (prov.isDeviceRegistered) ...[
+              ],
+            ),
             const SizedBox(height: 12),
-            const Row(
+            Row(
               children: [
-                Icon(Icons.verified_user_rounded, color: Colors.green, size: 16),
-                SizedBox(width: 8),
-                Text('Device Authorized', style: TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.bold)),
+                const Icon(Icons.verified_user_rounded, color: Colors.green, size: 16),
+                const SizedBox(width: 8),
+                const Text('Device Authorized', style: TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.bold)),
+                const Spacer(),
+                TextButton.icon(
+                  onPressed: () => _showResetDialog(context, prov),
+                  icon: const Icon(Icons.restart_alt_rounded, size: 14, color: Colors.red),
+                  label: const Text('Reset Session', style: TextStyle(fontSize: 11, color: Colors.red)),
+                ),
               ],
             ),
           ],
@@ -443,6 +453,30 @@ class _SyncDashboardBodyState extends State<_SyncDashboardBody> {
               }
             },
             child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showResetDialog(BuildContext context, SyncProvider prov) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Reset Camp Config?'),
+        content: const Text('This will clear your device registration and camp configuration. Local patient data will NOT be deleted, but you will need to re-register this device.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () async {
+              await prov.resetCamp();
+              if (mounted) {
+                Navigator.pop(context);
+                _campIdCtrl.clear();
+                _scaffoldKey.currentState?.showSnackBar(const SnackBar(content: Text('Camp configuration reset.')));
+              }
+            },
+            child: const Text('Reset', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
