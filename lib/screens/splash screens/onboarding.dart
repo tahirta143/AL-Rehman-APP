@@ -24,18 +24,18 @@ class OnboardingData {
 
 const List<OnboardingData> onboardingPages = [
   OnboardingData(
-    title: 'Al-Rehman\nEye Hospital',
-    subtitle: 'Providing world-class ophthalmic care with advanced technology and expert surgeons.',
+    title: 'Waseela\nDiabesity',
+    subtitle: 'Providing world-class diabesity care with advanced technology and expert doctors.',
     imagePath: 'assets/images/doctor2.png',
   ),
   OnboardingData(
-    title: 'Advanced Vision\nDiagnostics',
-    subtitle: 'From Cataract to Vitreo-Retinal care, we offer comprehensive eye health solutions.',
+    title: 'Advanced Diabetes\nDiagnostics',
+    subtitle: 'From blood glucose monitoring to specialized care, we offer comprehensive health solutions.',
     imagePath: 'assets/images/onboard2.png',
   ),
   OnboardingData(
-    title: 'Your Vision,\nOur Priority',
-    subtitle: 'Schedule your eye check-up instantly and experience personalised patient care.',
+    title: 'Your Health,\nOur Priority',
+    subtitle: 'Schedule your check-up instantly and experience personalised patient care.',
     imagePath: 'assets/images/dotor.png',
   ),
 ];
@@ -146,11 +146,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                 color: Colors.white.withOpacity(0.2),
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              child: Image.asset("assets/images/eye4.png")
+                              child: Image.asset("assets/images/Waseelalogo.png")
                             ),
                             const SizedBox(width: 10),
                             const Text(
-                              'Al-Rehman Eye Hospital',
+                              'Waseela Diabesity',
                               style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 15,

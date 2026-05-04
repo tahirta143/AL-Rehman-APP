@@ -77,10 +77,12 @@ class DoctorModel {
       isActive: json['is_active'] ?? 0,
       createdAt: json['created_at'] ?? '',
       updatedAt: json['updated_at'] ?? '',
-      availableDays: json['available_days'] ?? '',
-      consultationTimings: json['consultation_timings'] ?? '',
-      consultationTimeFrom: json['consultation_time_from'] ?? '',
-      consultationTimeTo: json['consultation_time_to'] ?? '',
+      availableDays: json['available_days'] is List 
+          ? (json['available_days'] as List).join(',') 
+          : (json['available_days']?.toString() ?? ''),
+      consultationTimings: json['consultation_timings']?.toString() ?? '',
+      consultationTimeFrom: json['consultation_time_from']?.toString() ?? '',
+      consultationTimeTo: json['consultation_time_to']?.toString() ?? '',
       hospitalName: json['hospital_name'] ?? '',
     );
   }

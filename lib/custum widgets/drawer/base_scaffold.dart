@@ -29,6 +29,8 @@ import '../../screens/pharmacy_screens/purchase_posting_screen.dart';
 import '../../screens/pharmacy_screens/sales_invoice_screen.dart';
 import 'drawer.dart';
 import '../../custum widgets/ai_chat_widget.dart';
+import '../../custum widgets/sync_indicator.dart';
+import '../../screens/sync/sync_dashboard.dart';
 
 // ─── FIX: Convert BaseScaffold from StatelessWidget to StatefulWidget ─────────
 //
@@ -97,35 +99,37 @@ class _BaseScaffoldState extends State<BaseScaffold> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      key: _effectiveKey,
-      backgroundColor: const Color(0xFFF8F9FA),
-      extendBody: true, // Allows content to flow behind the bottom bar
-
-      drawer: CustomDrawer(
-        selectedIndex: widget.drawerIndex,
-        onMenuItemTap: (index) {
-          Navigator.pop(context);
-          if (index != widget.drawerIndex) {
-            _navigateToScreen(context, index);
-          }
-        },
-      ),
-
-      floatingActionButton: widget.floatingActionButton,
-      floatingActionButtonLocation: widget.floatingActionButtonLocation,
-      bottomNavigationBar: widget.bottomNavigationBar ?? _buildBottomNavBar(),
-
-      body: Stack(
-        children: [
-          Column(
-            children: [
-              if (widget.showAppBar) _buildHeader(context, _effectiveKey),
-              Expanded(child: widget.body),
-            ],
-          ),
-          const AiChatWidget(),
-        ],
+    return ScaffoldMessenger(
+      child: Scaffold(
+        key: _effectiveKey,
+        backgroundColor: const Color(0xFFF8F9FA),
+        extendBody: true, // Allows content to flow behind the bottom bar
+  
+        drawer: CustomDrawer(
+          selectedIndex: widget.drawerIndex,
+          onMenuItemTap: (index) {
+            Navigator.pop(context);
+            if (index != widget.drawerIndex) {
+              _navigateToScreen(context, index);
+            }
+          },
+        ),
+  
+        floatingActionButton: widget.floatingActionButton,
+        floatingActionButtonLocation: widget.floatingActionButtonLocation,
+        bottomNavigationBar: widget.bottomNavigationBar ?? _buildBottomNavBar(),
+  
+        body: Stack(
+          children: [
+            Column(
+              children: [
+                if (widget.showAppBar) _buildHeader(context, _effectiveKey),
+                Expanded(child: widget.body),
+              ],
+            ),
+            const AiChatWidget(),
+          ],
+        ),
       ),
     );
   }
@@ -219,6 +223,8 @@ class _BaseScaffoldState extends State<BaseScaffold> {
                       color: Colors.white, size: 22),
                 ),
               ],
+              const SizedBox(width: 8),
+              const SyncIndicator(),
             ],
           ),
           if (widget.title == 'Dashboard')
@@ -308,6 +314,9 @@ class _BaseScaffoldState extends State<BaseScaffold> {
         break;
       case 20:
         screen = const SalesInvoiceScreen();
+        break;
+      case 100:
+        screen = const SyncDashboardScreen();
         break;
       case -1:
         _showLogoutDialog(context);

@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import '../../../core/services/opd_receipt_api_service.dart';
 import '../../../core/services/consultation_api_service.dart';
 import '../../../core/services/consultant_payments_api_service.dart';
-import '../../../global/global_api.dart';
 import '../../shift_management/shift_management.dart';
 import '../../../models/consultation_model/doctor_model.dart';
 import '../../../models/consultation_model/appointment_model.dart';
+import '../../../core/services/connectivity_service.dart';
+import '../../../core/services/camp_sync_service.dart';
+import '../../../core/utils/database_helper.dart';
 
 
 class OpdPatient {
@@ -19,6 +21,7 @@ class OpdPatient {
   final String city;
   final String panel;
   final String reference;
+  final String? deviceUuid;
 
   const OpdPatient({
     required this.mrNo,
@@ -30,6 +33,7 @@ class OpdPatient {
     required this.city,
     required this.panel,
     required this.reference,
+    this.deviceUuid,
   });
 }
 
@@ -77,10 +81,11 @@ class OpdSelectedService {
 
 class OpdProvider extends ChangeNotifier {
   final OpdReceiptApiService _apiService = OpdReceiptApiService();
-  final ConsultantPaymentsApiService _paymentApiService =
-  ConsultantPaymentsApiService();
-
+  final ConsultantPaymentsApiService _paymentApiService = ConsultantPaymentsApiService();
   final ConsultationApiService _consultationApi = ConsultationApiService();
+  final ConnectivityService _connectivity = ConnectivityService();
+  final CampSyncService _syncService = CampSyncService();
+  final DatabaseHelper _db = DatabaseHelper();
 
   List<DoctorModel> _availableDoctorModels = [];
   List<AppointmentModel> _upcomingAppointments = [];
@@ -320,132 +325,152 @@ class OpdProvider extends ChangeNotifier {
     _errorMessage = null;
     _safeNotify();
 
+    bool loadFromLocal = false;
+    if (!_connectivity.isOnline.value) {
+      loadFromLocal = true;
+    }
+
     try {
-      // Parallelize API calls for better performance
-      final results = await Future.wait([
-        _apiService.fetchOpdServices(),
-        _apiService.fetchLabTests(),
-        _apiService.fetchRadiologyTests(),
-      ]);
+      if (!loadFromLocal) {
+        try {
+          final results = await Future.wait([
+            _apiService.fetchOpdServices().timeout(const Duration(seconds: 10)),
+            _apiService.fetchLabTests().timeout(const Duration(seconds: 10)),
+            _apiService.fetchRadiologyTests().timeout(const Duration(seconds: 10)),
+          ]);
+          
+          final opdResult = results[0] as OpdServicesResult;
+          final labResult = results[1] as Map<String, dynamic>;
+          final radResult = results[2] as Map<String, dynamic>;
 
-      final opdResult = results[0] as OpdServicesResult;
-      final labResult = results[1] as Map<String, dynamic>;
-      final radResult = results[2] as Map<String, dynamic>;
+          if (opdResult.success) {
+            services.removeWhere((key, _) => key != 'consultation' && key != 'emergency');
 
-      if (_isDisposed) return; // CRASH FIX
+            for (var s in opdResult.services) {
+              if (s.isActive == 0) continue;
+              
+              final name = s.serviceName.toLowerCase();
+              final head = s.receiptType.toLowerCase();
+              double rate = double.tryParse(s.serviceRate) ?? 0.0;
+              String category = 'standard';
+              Color color = Colors.blueGrey;
+              IconData icon = Icons.medical_services_rounded;
 
-      // Clear dynamic categories but keep consultation/emergency if needed
-      services.removeWhere((key, _) => key != 'consultation' && key != 'emergency');
+              if (name.contains('consultation')) {
+                _consultationSrlNo = s.srlNo.toString();
+              }
 
-      // 1. Process OPD Services
-      if (opdResult.success) {
-        for (var s in opdResult.services) {
-          if (s.isActive != 1) continue;
+              if (head.contains('x-ray') || head.contains('xray') || name.contains('x-ray') || name.contains('xray')) {
+                category = 'xray'; color = const Color(0xFF1E88E5); icon = Icons.radio_rounded;
+              } else if (head.contains('ct scan') || head.contains('ctscan') || name.contains('ct scan') || name.contains('ctscan')) {
+                category = 'ctscan'; color = const Color(0xFF8E24AA); icon = Icons.document_scanner_rounded;
+              } else if (head.contains('mri') || name.contains('mri')) {
+                category = 'mri'; color = const Color(0xFF00ACC1); icon = Icons.blur_circular_rounded;
+              } else if (head.contains('ultrasound') || name.contains('ultrasound') || head.contains('u/s') || name.contains('u/s')) {
+                category = 'ultrasound'; color = const Color(0xFF43A047); icon = Icons.sensors_rounded;
+              } else if (head.contains('laboratory') || head.contains('lab') || name.contains('lab ') || name.contains(' laboratory')) {
+                category = 'laboratory'; color = const Color(0xFFF4511E); icon = Icons.biotech_rounded;
+              } else if (head.contains('emergency') || name.contains('emergency')) {
+                category = 'emergency'; color = const Color(0xFFE53935); icon = Icons.emergency_rounded;
+              }
 
-          final rate = double.tryParse(s.serviceRate) ?? 0.0;
-          String category = 'opd';
-          Color color = const Color(0xFFE53935);
-          IconData icon = Icons.local_hospital_rounded;
+              final service = OpdService(
+                id: s.serviceId, name: s.serviceName, category: category,
+                price: rate, icon: icon, color: color, imageUrl: s.imageUrl,
+              );
 
-          final head = s.serviceHead.toLowerCase();
-          final name = s.serviceName.toLowerCase();
-
-          // Parity Fix: Identify the Consultation service srl_no for mapping lookups
-          if (name.contains('consultation')) {
-            _consultationSrlNo = s.srlNo.toString();
+              if (!services.containsKey(category)) services[category] = [];
+              if (!services[category]!.any((e) => e.id == service.id)) {
+                services[category]!.add(service);
+              }
+            }
           }
 
-          // Categorize based on strings for standard OPD services
-          if (head.contains('x-ray') || head.contains('xray') || name.contains('x-ray') || name.contains('xray')) {
-            category = 'xray'; color = const Color(0xFF1E88E5); icon = Icons.radio_rounded;
-          } else if (head.contains('ct scan') || head.contains('ctscan') || name.contains('ct scan') || name.contains('ctscan')) {
-            category = 'ctscan'; color = const Color(0xFF8E24AA); icon = Icons.document_scanner_rounded;
-          } else if (head.contains('mri') || name.contains('mri')) {
-            category = 'mri'; color = const Color(0xFF00ACC1); icon = Icons.blur_circular_rounded;
-          } else if (head.contains('ultrasound') || name.contains('ultrasound') || head.contains('u/s') || name.contains('u/s')) {
-            category = 'ultrasound'; color = const Color(0xFF43A047); icon = Icons.sensors_rounded;
-          } else if (head.contains('laboratory') || head.contains('lab') || name.contains('lab ') || name.contains(' laboratory')) {
-            category = 'laboratory'; color = const Color(0xFFF4511E); icon = Icons.biotech_rounded;
-          } else if (head.contains('emergency') || name.contains('emergency')) {
-            category = 'emergency'; color = const Color(0xFFE53935); icon = Icons.emergency_rounded;
+          if (labResult['success'] == true) {
+            final list = labResult['data'] as List<dynamic>? ?? [];
+            for (var t in list) {
+              if (t['is_active'] == 0) continue;
+              final service = OpdService(
+                id: 'LB_${t['id'] ?? t['srl_no']}',
+                name: t['test_name']?.toString() ?? 'Unnamed Lab Test',
+                category: 'laboratory',
+                price: double.tryParse(t['test_rate']?.toString() ?? '0') ?? 0.0,
+                icon: Icons.biotech_rounded, color: const Color(0xFFF4511E),
+                imageUrl: t['image_url']?.toString(),
+              );
+              if (!services.containsKey('laboratory')) services['laboratory'] = [];
+              if (!services['laboratory']!.any((e) => e.id == service.id)) services['laboratory']!.add(service);
+            }
           }
 
-          final imageUrl = s.imageUrl;
-          if (imageUrl != null && imageUrl.isNotEmpty) {
-            debugPrint('🎯 Found image for OPD Service [${s.serviceName}]: $imageUrl');
+          if (radResult['success'] == true) {
+            final list = radResult['data'] as List<dynamic>? ?? [];
+            for (var t in list) {
+              if (t['is_active'] == 0) continue;
+              final testCatRaw = t['test_category']?.toString().toLowerCase() ?? '';
+              String category = 'xray';
+              Color color = const Color(0xFF1E88E5);
+              IconData icon = Icons.radio_rounded;
+              if (testCatRaw.contains('ct-scan') || testCatRaw.contains('ct scan')) {
+                category = 'ctscan'; color = const Color(0xFF8E24AA); icon = Icons.document_scanner_rounded;
+              } else if (testCatRaw.contains('mri')) {
+                category = 'mri'; color = const Color(0xFF00ACC1); icon = Icons.blur_circular_rounded;
+              } else if (testCatRaw.contains('ultrasound')) {
+                category = 'ultrasound'; color = const Color(0xFF43A047); icon = Icons.sensors_rounded;
+              }
+              final service = OpdService(
+                id: 'RD_${t['id'] ?? t['srl_no']}',
+                name: t['test_name']?.toString() ?? 'Unnamed Rad Test',
+                category: category,
+                price: double.tryParse(t['test_rate']?.toString() ?? '0') ?? 0.0,
+                icon: icon, color: color,
+                imageUrl: t['image_url']?.toString(),
+              );
+              if (!services.containsKey(category)) services[category] = [];
+              if (!services[category]!.any((e) => e.id == service.id)) services[category]!.add(service);
+            }
           }
-
-          final service = OpdService(
-            id: s.serviceId, name: s.serviceName, category: category,
-            price: rate, icon: icon, color: color, imageUrl: imageUrl,
-          );
-
-          if (!services.containsKey(category)) services[category] = [];
-          if (!services[category]!.any((e) => e.id == service.id)) {
-            services[category]!.add(service);
-          }
+        } catch (e) {
+          debugPrint('⚠️ OPD API Exception: $e. Falling back to local.');
+          loadFromLocal = true;
         }
       }
 
-      // 2. Process Lab Tests from Dedicated API
-      if (labResult['success'] == true) {
-        final list = labResult['data'] as List<dynamic>? ?? [];
-        for (var t in list) {
-          if (t['is_active'] == 0) continue;
-          
-          final service = OpdService(
-            id: 'LB_${t['id'] ?? t['srl_no']}',
-            name: t['test_name']?.toString() ?? 'Unnamed Lab Test',
-            category: 'laboratory',
-            price: double.tryParse(t['test_rate']?.toString() ?? '0') ?? 0.0,
-            icon: Icons.biotech_rounded,
-            color: const Color(0xFFF4511E),
-            imageUrl: t['image_url']?.toString(),
-          );
-          
-          if (!services.containsKey('laboratory')) services['laboratory'] = [];
-          if (!services['laboratory']!.any((e) => e.id == service.id)) {
-            services['laboratory']!.add(service);
+      if (loadFromLocal) {
+        debugPrint('📴 Loading OPD services from local master data.');
+        final localSvcs = await _db.queryAll('master_services');
+        if (localSvcs.isNotEmpty) {
+          services.removeWhere((key, _) => key != 'consultation' && key != 'emergency');
+          for (var s in localSvcs) {
+            if (s['is_active'] == 0) continue;
+            final name = s['service_name'].toString().toLowerCase();
+            final head = s['receipt_type'].toString().toLowerCase();
+            double rate = double.tryParse(s['service_rate'].toString()) ?? 0.0;
+            String category = 'standard';
+            Color color = Colors.blueGrey;
+            IconData icon = Icons.medical_services_rounded;
+
+            if (name.contains('consultation')) _consultationSrlNo = s['srl_no'].toString();
+
+            if (head.contains('x-ray') || head.contains('xray') || name.contains('x-ray') || name.contains('xray')) {
+              category = 'xray'; color = const Color(0xFF1E88E5); icon = Icons.radio_rounded;
+            } else if (head.contains('ct scan') || head.contains('ctscan') || name.contains('ct scan') || name.contains('ctscan')) {
+              category = 'ctscan'; color = const Color(0xFF8E24AA); icon = Icons.document_scanner_rounded;
+            } else if (head.contains('laboratory') || head.contains('lab') || name.contains('lab ') || name.contains(' laboratory')) {
+              category = 'laboratory'; color = const Color(0xFFF4511E); icon = Icons.biotech_rounded;
+            } else if (head.contains('emergency') || name.contains('emergency')) {
+              category = 'emergency'; color = const Color(0xFFE53935); icon = Icons.emergency_rounded;
+            }
+
+            final service = OpdService(
+              id: s['service_id'].toString(), name: s['service_name'].toString(), category: category,
+              price: rate, icon: icon, color: color,
+            );
+            if (!services.containsKey(category)) services[category] = [];
+            if (!services[category]!.any((e) => e.id == service.id)) services[category]!.add(service);
           }
         }
       }
-
-      // 3. Process Radiology Tests from Dedicated API
-      if (radResult['success'] == true) {
-        final list = radResult['data'] as List<dynamic>? ?? [];
-        for (var t in list) {
-          if (t['is_active'] == 0) continue;
-
-          final testCatRaw = t['test_category']?.toString().toLowerCase() ?? '';
-          String category = 'xray';
-          Color color = const Color(0xFF1E88E5);
-          IconData icon = Icons.radio_rounded;
-
-          if (testCatRaw.contains('ct-scan') || testCatRaw.contains('ct scan')) {
-            category = 'ctscan'; color = const Color(0xFF8E24AA); icon = Icons.document_scanner_rounded;
-          } else if (testCatRaw.contains('mri')) {
-            category = 'mri'; color = const Color(0xFF00ACC1); icon = Icons.blur_circular_rounded;
-          } else if (testCatRaw.contains('ultrasound')) {
-            category = 'ultrasound'; color = const Color(0xFF43A047); icon: Icons.sensors_rounded;
-          }
-
-          final service = OpdService(
-            id: 'RD_${t['id'] ?? t['srl_no']}',
-            name: t['test_name']?.toString() ?? 'Unnamed Rad Test',
-            category: category,
-            price: double.tryParse(t['test_rate']?.toString() ?? '0') ?? 0.0,
-            icon: icon,
-            color: color,
-            imageUrl: t['image_url']?.toString(),
-          );
-          
-          if (!services.containsKey(category)) services[category] = [];
-          if (!services[category]!.any((e) => e.id == service.id)) {
-            services[category]!.add(service);
-          }
-        }
-      }
-
       _errorMessage = null;
     } catch (e) {
       if (!_isDisposed) _errorMessage = 'Failed to load services: $e';
@@ -458,80 +483,97 @@ class OpdProvider extends ChangeNotifier {
 
   // ── Load Doctors ──
   Future<void> loadDoctors() async {
+    debugPrint('🔍 loadDoctors triggered. isOnline: ${_connectivity.isOnline.value}');
+    bool loadFromLocal = false;
+    if (!_connectivity.isOnline.value) {
+      loadFromLocal = true;
+    }
+
     try {
-      await fetchServiceMappings();
-      if (_consultationSrlNo == null) {
-        await loadOpdServices();
+      if (!loadFromLocal) {
+        try {
+          await fetchServiceMappings().timeout(const Duration(seconds: 5));
+          if (_consultationSrlNo == null) {
+             await loadOpdServices().timeout(const Duration(seconds: 10));
+          }
+          
+          final result = await _consultationApi.fetchDoctors().timeout(const Duration(seconds: 10));
+          if (result.success && result.doctors.isNotEmpty) {
+             final colors = [
+               const Color(0xFF00B5AD), const Color(0xFF8E24AA),
+               const Color(0xFF1E88E5), const Color(0xFFE53935),
+               const Color(0xFF43A047), const Color(0xFFF4511E),
+               const Color(0xFF00897B), const Color(0xFFD81B60),
+             ];
+             final doctorServices = result.doctors
+                 .where((d) => d.isActive == 1)
+                 .toList()
+                 .asMap()
+                 .entries
+                 .map((entry) {
+               final i = entry.key;
+               final d = entry.value;
+               double fee = double.tryParse(d.consultationFee) ?? 0.0;
+               return OpdService(
+                 id: d.doctorId,
+                 name: 'Dr. ${d.doctorName}',
+                 category: 'consultation',
+                 price: fee,
+                 icon: Icons.person_rounded,
+                 color: colors[i % colors.length],
+               );
+             }).toList();
+             services['consultation'] = doctorServices;
+             _safeNotify();
+             return;
+          } else {
+             debugPrint('⚠️ Doctor API failed: ${result.message}. Trying local.');
+             loadFromLocal = true;
+          }
+        } catch (e) {
+          debugPrint('⚠️ Doctor API Exception: $e. Trying local.');
+          loadFromLocal = true;
+        }
       }
-      final result = await _consultationApi.fetchDoctors();
 
-      if (_isDisposed) return; // CRASH FIX
-
-      if (result.success && result.doctors.isNotEmpty) {
-        final colors = [
-          const Color(0xFF00B5AD), const Color(0xFF8E24AA),
-          const Color(0xFF1E88E5), const Color(0xFFE53935),
-          const Color(0xFF43A047), const Color(0xFFF4511E),
-          const Color(0xFF00897B), const Color(0xFFD81B60),
-        ];
-        final doctorServices = result.doctors
-            .where((d) => d.isActive == 1)
-            .toList()
-            .asMap()
-            .entries
-            .map((entry) {
-          final i = entry.key;
-          final d = entry.value;
-          double fee = double.tryParse(d.consultationFee) ?? 0.0;
-          
-          // Parity Fix: Resolve dynamic consultation fee from mappings using srl_no
-          // Mirroring React's resolveConsultationPricing logic
-          double followUpFee = (fee * 0.7).floorToDouble();
-          
-          final lookupKey = _consultationSrlNo ?? 'Consultation';
-          if (_serviceDocs.containsKey(lookupKey)) {
-            final mappings = _serviceDocs[lookupKey] as List<dynamic>;
-            final match = mappings.firstWhere(
-              (m) => m['doctor_srl_no'].toString() == d.srlNo.toString(),
-              orElse: () => null,
-            );
-            if (match != null) {
-              if (match['rate'] != null) {
-                fee = double.tryParse(match['rate'].toString()) ?? fee;
-              }
-              // Check for free follow-up period (followup_days > 0)
-              final fUpDays = int.tryParse(match['followup_days']?.toString() ?? '0') ?? 0;
-              if (fUpDays > 0) {
-                followUpFee = 0;
-              } else {
-                followUpFee = (fee * 0.7).floorToDouble();
-              }
-            }
-          }
-
-          final spec = d.doctorSpecialization.isNotEmpty ? ' (${d.doctorSpecialization})' : '';
-          final imageUrl = d.imageUrl;
-          if (imageUrl != null && imageUrl.isNotEmpty) {
-            debugPrint('👨‍⚕️ Found image for Doctor [${d.doctorName}]: $imageUrl');
-          }
-
-          return OpdService(
-            id: d.doctorId, name: 'Dr. ${d.doctorName}$spec',
-            category: 'consultation', price: fee,
-            followUpPrice: followUpFee,
-            icon: Icons.person_rounded, color: colors[i % colors.length],
-            imageUrl: imageUrl,
-          );
-        }).toList();
-
-        services['consultation'] = doctorServices;
-        _availableDoctorModels = result.doctors;
-        _safeNotify();
+      if (loadFromLocal) {
+        debugPrint('📴 Loading doctors from local master data.');
+        final localDocs = await _db.queryAll('master_doctors');
+        if (localDocs.isNotEmpty) {
+           final colors = [
+             const Color(0xFF00B5AD), const Color(0xFF8E24AA),
+             const Color(0xFF1E88E5), const Color(0xFFE53935),
+             const Color(0xFF43A047), const Color(0xFFF4511E),
+             const Color(0xFF00897B), const Color(0xFFD81B60),
+           ];
+           final doctorServices = localDocs.asMap().entries.map((entry) {
+             final i = entry.key;
+             final d = entry.value;
+             final fee = double.tryParse(d['consultation_fee'] ?? '0') ?? 0.0;
+             return OpdService(
+               id: d['doctor_id'],
+               name: 'Dr. ${d['doctor_name']}',
+               category: 'consultation',
+               price: fee,
+               followUpPrice: (fee * 0.7).floorToDouble(),
+               icon: Icons.person_rounded,
+               color: colors[i % colors.length],
+             );
+           }).toList();
+           services['consultation'] = doctorServices;
+           _errorMessage = null; // Found locally
+           _safeNotify();
+        } else {
+           debugPrint('❌ No doctors found in local master data.');
+           _errorMessage = 'No doctors found. If you are at a camp, please "Bootstrap" while online.';
+           _safeNotify();
+        }
       }
     } catch (e) {
-      debugPrint('❌ Error loading doctors: $e');
+      debugPrint('❌ Fatal error in loadDoctors: $e');
     }
   }
+
 
   // ── Fetch Upcoming Appointments ──
   Future<void> fetchUpcomingAppointments(String mrNumber) async {
@@ -547,8 +589,8 @@ class OpdProvider extends ChangeNotifier {
       if (res.success) {
         final todayStr = DateTime.now().toIso8601String().split('T')[0];
         _upcomingAppointments = res.appointments.where((a) {
-          final aDate = a.appointmentDate?.split('T')[0];
-          return aDate == todayStr && a.status?.toLowerCase() != 'cancelled';
+          final aDate = a.appointmentDate.split('T')[0];
+          return aDate == todayStr && a.status.toLowerCase() != 'cancelled';
         }).toList();
       } else {
         _upcomingAppointments = [];
@@ -615,6 +657,37 @@ class OpdProvider extends ChangeNotifier {
   }
 
   // ── Load page 1 (called on init and refresh) ──
+  Map<String, dynamic> _localVisitToMap(Map<String, dynamic> v) {
+    DateTime parsedDate;
+    try {
+      parsedDate = DateTime.parse(v['date'] ?? DateTime.now().toIso8601String());
+    } catch (_) {
+      parsedDate = DateTime.now();
+    }
+
+    return {
+      'srl_no': 0,
+      'receipt_id': v['receipt_id'] ?? 'LOCAL',
+      'receiptNo': v['receipt_id'] ?? 'LOCAL',
+      'mrNo': v['mr_number'] ?? v['patient_uuid'] ?? '',
+      'patient_mr_number': v['mr_number'] ?? v['patient_uuid'] ?? '',
+      'patient_name': v['patient_name'] ?? '',
+      'patientName': v['patient_name'] ?? '',
+      'age': '',
+      'patient_age': null,
+      'gender': '',
+      'patient_gender': '',
+      'date': parsedDate,
+      'time': v['time'] ?? '',
+      'opd_service': v['opd_service'] ?? '',
+      'service_detail': v['opd_service'] ?? '',
+      'total_amount': double.tryParse(v['total_amount']?.toString() ?? '0') ?? 0.0,
+      'discount': 0.0,
+      'paid': double.tryParse(v['paid']?.toString() ?? '0') ?? 0.0,
+      'status': 'Pending Sync', // Special status for local data
+    };
+  }
+
   Future<void> loadReceipts() async {
     if (_isDisposed) return;
 
@@ -626,18 +699,35 @@ class OpdProvider extends ChangeNotifier {
     _safeNotify();
 
     try {
-      final result = await _apiService.fetchOpdReceipts(page: 1, limit: _pageSize);
+      // 1. Load local pending visits first
+      final localVisits = await _db.queryAll('visits_local');
+      final List<Map<String, dynamic>> localMapped = localVisits
+          .where((v) => v['sync_status'] == 'pending')
+          .map((v) => _localVisitToMap(v))
+          .toList();
+      
+      _receipts.addAll(localMapped);
+      _totalCount = localMapped.length;
 
-      if (_isDisposed) return; // CRASH FIX: widget might be gone by now
+      // 2. Try online load
+      if (_connectivity.isOnline.value) {
+        try {
+          final result = await _apiService.fetchOpdReceipts(page: 1, limit: _pageSize).timeout(const Duration(seconds: 10));
 
-      if (result.success) {
-        _receipts.addAll(result.receipts.map(_toReceiptMap));
-        _totalPages = result.totalPages;
-        _totalCount = result.totalCount;
-        _currentPage = 2; // next page to fetch
-        _errorMessage = null;
-      } else {
-        _errorMessage = result.message;
+          if (_isDisposed) return;
+
+          if (result.success) {
+            _receipts.addAll(result.receipts.map(_toReceiptMap));
+            _totalPages = result.totalPages;
+            _totalCount += result.totalCount;
+            _currentPage = 2;
+            _errorMessage = null;
+          } else {
+            _errorMessage = result.message;
+          }
+        } catch (e) {
+          debugPrint('⚠️ Online receipts load failed (ignoring since offline records shown): $e');
+        }
       }
     } catch (e) {
       if (!_isDisposed) {
@@ -986,8 +1076,7 @@ class OpdProvider extends ChangeNotifier {
       }
     }
 
-    // Map category keys to display labels matching React's OPDReceipt.jsx logic
-    String _categoryToLabel(String category, OpdSelectedService svc) {
+    String categoryToLabel(String category, OpdSelectedService svc) {
       switch (category) {
         case 'consultation': return 'Consultation';
         case 'laboratory':   return 'Laboratory';
@@ -1000,7 +1089,7 @@ class OpdProvider extends ChangeNotifier {
       }
     }
 
-    final servicesHeads = services.map((s) => _categoryToLabel(s.service.category, s)).toSet().toList();
+    final servicesHeads = services.map((s) => categoryToLabel(s.service.category, s)).toSet().toList();
     // React prefixes consultation details with "Dr. Name"
     final detailsList = services.map((s) {
       if (s.service.category == 'consultation' && s.doctorName != null && s.doctorName!.isNotEmpty) {
@@ -1084,27 +1173,73 @@ class OpdProvider extends ChangeNotifier {
 
     debugPrint('══ OPD RECEIPT PAYLOAD ══\n$payload');
 
-    final apiResult = await _apiService.createOpdReceipt(payload);
+    bool success = false;
+    bool savedLocally = false;
 
-    debugPrint('══ OPD RECEIPT RESULT ══\nsuccess: ${apiResult.success}\nmessage: ${apiResult.message}');
+    if (_connectivity.isOnline.value) {
+      try {
+        final apiResult = await _apiService.createOpdReceipt(payload).timeout(const Duration(seconds: 10));
+        success = apiResult.success;
+        if (success) {
+          _lastSavedReceiptId = apiResult.receipt?.receiptId;
+          _lastSavedReceiptTokens = apiResult.tokens ?? apiResult.receipt?.tokens;
+        } else {
+          _errorMessage = apiResult.message;
+          debugPrint('❌ API Save Failed: ${apiResult.message}');
+          // If it's a network error or server down, we can fallback
+          if (apiResult.message?.toLowerCase().contains('connection') == true || 
+              apiResult.message?.toLowerCase().contains('timeout') == true ||
+              apiResult.message?.toLowerCase().contains('failed to connect') == true) {
+            savedLocally = true;
+          }
+        }
+      } catch (e) {
+        debugPrint('⚠️ API Exception: $e. Falling back to local storage.');
+        savedLocally = true;
+      }
+    } else {
+      savedLocally = true;
+    }
 
-    if (_isDisposed) return apiResult.success;
+    if (savedLocally) {
+      debugPrint('📴 Saving receipt locally (Offline/API Failure).');
+      try {
+        final localVisit = {
+          'patient_uuid': patient.deviceUuid ?? payload['patient_mr_number'],
+          'mr_number': payload['patient_mr_number'], // Store the MR (could be PENDING)
+          'patient_name': payload['patient_name'],
+          'receipt_id': 'LOCAL-${DateTime.now().millisecondsSinceEpoch}',
+          'date': payload['date'],
+          'time': payload['time'],
+          'opd_service': payload['opd_service'],
+          'total_amount': payload['total_amount'],
+          'paid': payload['paid'],
+          'sync_status': 'pending',
+        };
+        _lastSavedReceiptId = await _syncService.saveVisitLocal(localVisit);
+        success = true;
+      } catch (e) {
+        debugPrint('❌ Local Save Error: $e');
+        _errorMessage = 'Failed to save locally: $e';
+        success = false;
+      }
+    }
 
-    if (!apiResult.success) {
-      _errorMessage = apiResult.message;
+    debugPrint('══ OPD RECEIPT RESULT ══\nsuccess: $success');
+
+    if (_isDisposed) return success;
+
+    if (!success) {
       _safeNotify();
       return false;
     }
-
-    _lastSavedReceiptId = apiResult.receipt?.receiptId;
-    _lastSavedReceiptTokens = apiResult.tokens ?? apiResult.receipt?.tokens;
     _lastSavedReceiptServices = List<Map<String, dynamic>>.from(serviceDetails);
     _lastSavedReceiptTotal = totalAmount;
     _lastSavedReceiptDiscount = discount;
 
     // Post-save cleanup logic removed (MR incrementing handled by MrProvider + UI)
 
-    if (!_isReferredToDiscount) {
+    if (!_isReferredToDiscount && _connectivity.isOnline.value) {
       for (var i = 0; i < services.length; i++) {
         final svc = services[i];
         final detail = serviceDetails[i];
@@ -1141,7 +1276,7 @@ class OpdProvider extends ChangeNotifier {
 
     if (_isDisposed) return true;
 
-    final receiptNo = apiResult.receipt?.receiptId ?? 'OPD$_receiptCounter';
+    final receiptNo = _lastSavedReceiptId ?? 'OPD$_receiptCounter';
 
     _receipts.insert(0, {
       'receiptNo': receiptNo,

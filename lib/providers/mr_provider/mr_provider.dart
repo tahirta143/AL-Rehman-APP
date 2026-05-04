@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
 import '../../core/services/mr_api_service.dart';
+import '../../core/services/connectivity_service.dart';
+import '../../core/services/camp_sync_service.dart';
+import '../../core/utils/database_helper.dart';
 import '../../models/mr_model/mr_patient_model.dart';
 
 class MrProvider extends ChangeNotifier {
   final MrApiService _apiService = MrApiService();
+  final ConnectivityService _connectivity = ConnectivityService();
+  final CampSyncService _syncService = CampSyncService();
+  final DatabaseHelper _db = DatabaseHelper();
 
   // ── Pagination State ──
   static const int _pageSize = 50;
@@ -51,7 +57,6 @@ class MrProvider extends ChangeNotifier {
     }).toList();
   }
 
-  // ── Initial Load (page 1) ──
   Future<void> loadPatients() async {
     _isLoading = true;
     _errorMessage = null;
@@ -60,20 +65,41 @@ class MrProvider extends ChangeNotifier {
     _totalCount = 0;
     notifyListeners();
 
-    final result = await _apiService.fetchAllPatients(
-      page: 1,
-      limit: _pageSize,
-    );
+    try {
+      // 1. Load Local Pending Patients
+      final localPatients = await _db.queryAll('patients_local');
+      final List<PatientModel> merged = localPatients
+          .where((p) => p['sync_status'] == 'pending')
+          .map((p) => PatientModel.fromLocalMap(p))
+          .toList();
 
-    if (result.success) {
-      _patients = result.patients.map((p) => p.toPatientModel()).toList();
-      _totalPages = result.totalPages;
-      _totalCount = result.count;
-      _currentPage = 2;
-      _errorMessage = null;
-    } else {
-      _errorMessage = result.message;
-      _patients = [];
+      _totalCount = merged.length;
+
+      // 2. Load Online Patients (if online)
+      if (_connectivity.isOnline.value) {
+        try {
+          final result = await _apiService.fetchAllPatients(
+            page: 1,
+            limit: _pageSize,
+          ).timeout(const Duration(seconds: 10));
+
+          if (result.success) {
+            merged.addAll(result.patients.map((p) => p.toPatientModel()).toList());
+            _totalPages = result.totalPages;
+            _totalCount += result.count;
+            _currentPage = 2;
+          } else {
+            _errorMessage = result.message;
+          }
+        } catch (e) {
+          debugPrint('⚠️ Online patients load failed (using local only): $e');
+        }
+      }
+
+      _patients = merged;
+    } catch (e) {
+      debugPrint('Error loading patients: $e');
+      _errorMessage = e.toString();
     }
 
     _isLoading = false;
@@ -107,27 +133,70 @@ class MrProvider extends ChangeNotifier {
 
   // ── Fetch Next MR Number ──
   Future<void> fetchNextMR() async {
-    final result = await _apiService.fetchNextMRNumber();
-    if (result.success && result.nextMR != null) {
-      _nextMrNumber = result.nextMR;
+    if (!_connectivity.isOnline.value) {
+      _nextMrNumber = 'OFF-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+      notifyListeners();
+      return;
+    }
+
+    try {
+      final result = await _apiService.fetchNextMRNumber().timeout(const Duration(seconds: 5));
+      if (result.success && result.nextMR != null) {
+        _nextMrNumber = result.nextMR;
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('⚠️ fetchNextMR failed: $e');
+      _nextMrNumber = 'OFF-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
       notifyListeners();
     }
   }
 
   // ── Live Search patients by name or phone ──
   Future<List<PatientModel>> searchPatients(String query) async {
-    if (query.trim().length < 2) return [];
+    final q = query.trim().toLowerCase();
+    if (q.length < 2) return [];
 
-    final result = await _apiService.fetchAllPatients(
-      page: 1,
-      limit: 20,
-      search: query.trim(),
-    );
+    List<PatientModel> results = [];
 
-    if (result.success) {
-      return result.patients.map((p) => p.toPatientModel()).toList();
+    // 1. Search Local
+    try {
+      final local = await _db.queryAll('patients_local');
+      final matches = local.where((p) {
+        final name = '${p['first_name']} ${p['last_name']}'.toLowerCase();
+        final mr = (p['mr_number'] ?? '').toString().toLowerCase();
+        final phone = (p['phone'] ?? '').toString();
+        return name.contains(q) || mr.contains(q) || phone.contains(q);
+      }).map((p) => PatientModel.fromLocalMap(p)).toList();
+      results.addAll(matches);
+    } catch (e) {
+      debugPrint('⚠️ Local search failed: $e');
     }
-    return [];
+
+    // 2. Search API (if online)
+    if (_connectivity.isOnline.value) {
+      try {
+        final apiResult = await _apiService.fetchAllPatients(
+          page: 1,
+          limit: 20,
+          search: q,
+        ).timeout(const Duration(seconds: 10));
+
+        if (apiResult.success) {
+          final apiPatients = apiResult.patients.map((p) => p.toPatientModel()).toList();
+          // Avoid duplicates (by MR Number)
+          for (var p in apiPatients) {
+            if (!results.any((existing) => existing.mrNumber == p.mrNumber)) {
+              results.add(p);
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('⚠️ API search failed: $e');
+      }
+    }
+
+    return results;
   }
 
   // ── MR number lookup — always hits API to get full data with history ──
@@ -136,6 +205,30 @@ class MrProvider extends ChangeNotifier {
     if (trimmed.isEmpty) return null;
 
     final searchInput = normalize ? _normalizeMrNumber(trimmed) : trimmed;
+
+    if (!_connectivity.isOnline.value) {
+      debugPrint('📴 App is OFFLINE. Searching patient in local DB.');
+      final localPatient = await _db.queryPending('patients_local');
+      final match = localPatient.firstWhere(
+        (p) => p['mr_number'] == searchInput,
+        orElse: () => {},
+      );
+      if (match.isNotEmpty) {
+        return PatientModel(
+          mrNumber: match['mr_number'],
+          firstName: match['first_name'],
+          lastName: match['last_name'],
+          guardianName: match['guardian_name'],
+          gender: match['gender'],
+          phoneNumber: match['phone'],
+          address: match['address'],
+          city: match['city'],
+          bloodGroup: match['blood_group'],
+          registeredAt: DateTime.parse(match['created_at']),
+        );
+      }
+      return null;
+    }
 
     // ✅ Always fetch from API so we get visit history
     final result = await _apiService.fetchPatientByMR(searchInput);
@@ -227,23 +320,89 @@ class MrProvider extends ChangeNotifier {
       registeredAt: DateTime.now(),
     );
 
-    final result = await _apiService.createPatient(patient.toApiRequest());
-    _isCreating = false;
+    bool savedLocally = false;
+    PatientModel? createdPatient;
 
-    if (result.success && result.patient != null) {
-      final createdPatient = result.patient!.toPatientModel();
-      _patients.insert(0, createdPatient);
-      _totalCount++;
-      _selectedPatient = createdPatient;
-      _errorMessage = null;
-      notifyListeners();
-      fetchNextMR();
-      return createdPatient;
+    if (_connectivity.isOnline.value) {
+      try {
+        final result = await _apiService.createPatient(patient.toApiRequest()).timeout(const Duration(seconds: 10));
+        if (result.success && result.patient != null) {
+          createdPatient = result.patient!.toPatientModel();
+          _patients.insert(0, createdPatient);
+          _totalCount++;
+          _selectedPatient = createdPatient;
+          _errorMessage = null;
+        } else {
+          _errorMessage = result.message;
+          debugPrint('❌ API Registration Failed: ${result.message}');
+          if (result.message?.toLowerCase().contains('connection') == true || 
+              result.message?.toLowerCase().contains('timeout') == true ||
+              result.message?.toLowerCase().contains('failed to connect') == true) {
+            savedLocally = true;
+          }
+        }
+      } catch (e) {
+        debugPrint('⚠️ API Exception during registration: $e. Falling back to local storage.');
+        savedLocally = true;
+      }
     } else {
-      _errorMessage = result.message;
-      notifyListeners();
-      return null;
+      savedLocally = true;
     }
+
+    if (savedLocally) {
+      debugPrint('📴 Saving patient locally (Offline/API Failure).');
+      try {
+        final uuid = await _syncService.savePatientLocal({
+          'mr_number': patient.mrNumber,
+          'first_name': patient.firstName,
+          'last_name': patient.lastName,
+          'guardian_name': patient.guardianName,
+          'gender': patient.gender,
+          'phone': patient.phoneNumber,
+          'address': patient.address,
+          'city': patient.city,
+          'blood_group': patient.bloodGroup,
+        });
+        
+        createdPatient = PatientModel(
+          mrNumber: patient.mrNumber,
+          firstName: patient.firstName,
+          lastName: patient.lastName,
+          guardianName: patient.guardianName,
+          relation: patient.relation,
+          gender: patient.gender,
+          dateOfBirth: patient.dateOfBirth,
+          age: patient.age,
+          bloodGroup: patient.bloodGroup,
+          profession: patient.profession,
+          education: patient.education,
+          whatsappNo: patient.whatsappNo,
+          phoneNumber: patient.phoneNumber,
+          email: patient.email,
+          cnic: patient.cnic,
+          address: patient.address,
+          city: patient.city,
+          registeredAt: patient.registeredAt,
+          deviceUuid: uuid, // Capture the local device UUID
+          syncStatus: 'pending',
+        );
+        
+        _patients.insert(0, createdPatient);
+        _totalCount++;
+        _selectedPatient = createdPatient;
+        _errorMessage = null;
+      } catch (e) {
+        debugPrint('❌ Local Registration Error: $e');
+        _errorMessage = 'Failed to save locally: $e';
+      }
+    }
+
+    _isCreating = false;
+    notifyListeners();
+    if (createdPatient != null && _connectivity.isOnline.value) {
+       fetchNextMR();
+    }
+    return createdPatient;
   }
 
   // ── Update existing patient via API ──

@@ -787,8 +787,16 @@ class _OpdRecordsScreenState extends State<OpdRecordsScreen> {
         child: Row(children: [
           Expanded(flex: 1, child: Text('${index + 1}',
               style: TextStyle(fontSize: _fsS, color: Colors.black54))),
-          Expanded(flex: 2, child: Text(rec['receiptNo'] ?? '',
-              style: TextStyle(fontSize: _fsS, fontWeight: FontWeight.w600, color: Colors.black87))),
+          Expanded(flex: 2, child: Row(
+            children: [
+              Text(rec['receiptNo'] ?? '',
+                  style: TextStyle(fontSize: _fsS, fontWeight: FontWeight.w600, color: Colors.black87)),
+              if (status == 'Pending Sync') ...[
+                const SizedBox(width: 4),
+                Icon(Icons.cloud_off_rounded, size: 12, color: Colors.amber.shade700),
+              ]
+            ],
+          )),
           Expanded(flex: 2, child: Text(rec['mrNo'] ?? '',
               style: TextStyle(fontSize: _fsS, color: Colors.black87))),
           Expanded(flex: 2, child: Text(_fmtDate(date),
@@ -976,6 +984,7 @@ class _OpdRecordsScreenState extends State<OpdRecordsScreen> {
     switch (status) {
       case 'Cancelled': c = Colors.red;    icon = Icons.cancel_rounded;        break;
       case 'Refunded':  c = Colors.orange; icon = Icons.undo_rounded;          break;
+      case 'Pending Sync': c = Colors.amber.shade800; icon = Icons.cloud_off_rounded; break;
       default:          c = primary;       icon = Icons.check_circle_rounded;
     }
     return Container(

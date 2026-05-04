@@ -133,12 +133,12 @@ class _SignInScreenState extends State<SignInScreen> {
                         color: Colors.white.withOpacity(0.20)
                       ),
                       child: Center(
-                        child: Image.asset("assets/images/eye4.png")
+                        child: Image.asset("assets/images/Waseelalogo.png")
                       ),
                     ),
                     // SizedBox(height: screenH * 0.01),
                     Text(
-                      'Al-Rehman Eye',
+                      'Waseela Diabesity',
                       style: TextStyle(
                         fontSize: screenW * 0.055,
                         fontWeight: FontWeight.bold,

@@ -4,9 +4,10 @@
     <!-- Allow scanning/connecting USB (OTG) thermal printers -->
     <uses-feature android:name="android.hardware.usb.host" android:required="false" />
     <application
-        android:label="Al-RehmanEye Hospital"
+        android:label="Waseela Diabesity"
         android:name="${applicationName}"
         android:usesCleartextTraffic="true"
+        android:enableOnBackInvokedCallback="true"
         android:icon="@mipmap/ic_launcher">
         <activity
             android:name=".MainActivity"

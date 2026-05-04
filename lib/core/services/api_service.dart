@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/cupertino.dart';
 import 'package:hims_app/global/global_api.dart';
 import 'package:http/http.dart' as http;
 import 'auth_storage_service.dart';
@@ -67,6 +68,10 @@ class ApiService {
           .timeout(const Duration(seconds: 15));
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
+      debugPrint('🔑 Login Response Keys: ${data.keys.toList()}');
+      if (data['success'] == true) {
+        debugPrint('🔑 Full Login Data: $data');
+      }
 
       if (response.statusCode == 200 && data['success'] == true) {
         return LoginResult(

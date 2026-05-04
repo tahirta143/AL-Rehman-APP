@@ -290,6 +290,13 @@ class _CustomDrawerState extends State<CustomDrawer> {
                       index: 8,
                     ),
 
+                  // Sync Dashboard
+                  _buildDrawerItem(
+                    icon: Icons.sync_rounded,
+                    title: 'Sync Dashboard',
+                    index: 100,
+                  ),
+
                   // ── Prescription Dropdown ──────────────────────────────────
                   if (prescriptionItems.isNotEmpty)
                     _buildGroupHeader(

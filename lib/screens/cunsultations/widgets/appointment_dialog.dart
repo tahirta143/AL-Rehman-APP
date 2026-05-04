@@ -6,6 +6,7 @@ import '../../../providers/opd/consultation_provider/cunsultation_provider.dart'
 import '../../../providers/mr_provider/mr_provider.dart';
 import '../../../../custum widgets/custom_loader.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../../providers/dashboard/dashboard_provider.dart';
 import '../../../../global/global_api.dart';
 
 class AppointmentDialog extends StatefulWidget {
@@ -142,7 +143,10 @@ class _AppointmentDialogState extends State<AppointmentDialog> {
         for (int d = 1; d <= daysInMonth; d++) {
           final date = DateTime(tempMonth.year, tempMonth.month, d);
           final dayName = dayNames[date.weekday % 7];
-          final isAvail = widget.doctor.availableDays.contains(dayName);
+          final fullDayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+          final fullDayName = fullDayNames[date.weekday % 7];
+          final isAvail = widget.doctor.availableDays.contains(dayName) || 
+                          widget.doctor.availableDays.contains(fullDayName);
           final isPast =
               date.isBefore(DateTime(today.year, today.month, today.day));
           final isSel = date.year == tempDate.year &&
@@ -312,7 +316,10 @@ class _AppointmentDialogState extends State<AppointmentDialog> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) => const Center(child: CustomLoader(size: 80)),
+      builder: (_) => Material(
+        color: Colors.black.withOpacity(0.3),
+        child: const Center(child: CustomLoader(size: 80)),
+      ),
     );
 
     final appointment = ConsultationAppointment(
@@ -343,14 +350,35 @@ class _AppointmentDialogState extends State<AppointmentDialog> {
       success = await prov.addAppointment(appointment);
     }
 
-    if (mounted) Navigator.pop(context);
+    // Refresh Dashboard if success
+    if (success) {
+      try {
+        final dashProv = Provider.of<DashboardProvider>(context, listen: false);
+        await dashProv.fetchCalendarData(appointment.appointmentDate);
+      } catch (e) {
+        debugPrint('Error refreshing dashboard: $e');
+      }
+    }
+
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    if (mounted) Navigator.pop(context); // Close loader
 
     if (success) {
-      if (mounted) Navigator.pop(context);
-      _snack(widget.editAppointment != null ? 'Appointment updated successfully!' : 'Appointment booked successfully!', err: false);
+      _snackWithMessenger(scaffoldMessenger, widget.editAppointment != null ? 'Appointment updated successfully!' : 'Appointment booked successfully!', err: false);
+      if (mounted) Navigator.pop(context); // Close dialog
     } else {
-      _snack(prov.errorMessage ?? 'Operation failed', err: true);
+      _snackWithMessenger(scaffoldMessenger, prov.errorMessage ?? 'Operation failed', err: true);
     }
+  }
+
+  void _snackWithMessenger(ScaffoldMessengerState messenger, String msg, {required bool err}) {
+    messenger.showSnackBar(SnackBar(
+      content: Text(msg, style: const TextStyle(color: Colors.white)),
+      backgroundColor: err ? Colors.red.shade400 : primary,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      margin: const EdgeInsets.all(16),
+    ));
   }
 
   void _snack(String msg, {required bool err}) {
@@ -431,6 +459,11 @@ class _AppointmentDialogState extends State<AppointmentDialog> {
     final sh = MediaQuery.of(context).size.height;
     final prov = Provider.of<ConsultationProvider>(context);
     final allSlots = prov.generateTimeSlots(widget.doctor.timings);
+    // Ensure selected slot exists in items to prevent crash
+    if (_selectedSlot != null && !allSlots.contains(_selectedSlot)) {
+      allSlots.add(_selectedSlot!);
+      allSlots.sort(); // Keep it tidy if possible
+    }
     final booked = prov.bookedSlots(_selectedDate, widget.doctor.name);
 
     final double fs = sw < 360 ? 11.5 : 13.0;
@@ -442,13 +475,15 @@ class _AppointmentDialogState extends State<AppointmentDialog> {
       insetPadding: EdgeInsets.symmetric(
           horizontal: sw >= 720 ? sw * 0.08 : sw * 0.025,
           vertical: sh * 0.025),
-      child: Container(
-        constraints: BoxConstraints(maxHeight: sh * 0.92),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF0F4F8),
-          borderRadius: BorderRadius.circular(sw * 0.05),
-        ),
-        child: Column(children: [
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: Container(
+          constraints: BoxConstraints(maxHeight: sh * 0.92),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF0F4F8),
+            borderRadius: BorderRadius.circular(sw * 0.05),
+          ),
+          child: Column(children: [
           Container(
             padding: EdgeInsets.all(sw * 0.04),
             decoration: BoxDecoration(
@@ -842,7 +877,7 @@ class _AppointmentDialogState extends State<AppointmentDialog> {
                                 borderRadius: BorderRadius.circular(sw * 0.02),
                                 menuWidth: sw * 0.45,
                                 items: allSlots
-                                    .where((slot) => !booked.contains(slot) || slot == widget.editAppointment?.timeSlot)
+                                    .where((slot) => !booked.contains(slot) || slot == _selectedSlot)
                                     .map((slot) {
                                   return DropdownMenuItem<String>(
                                     value: slot,
@@ -1041,8 +1076,8 @@ class _AppointmentDialogState extends State<AppointmentDialog> {
             ),
           ),
         ]),
-      ),
-    );
+      )
+    ));
   }
 
   Widget _chipMsg(

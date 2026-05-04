@@ -235,6 +235,8 @@ class PatientModel {
   int totalVisits;
   int visitsToday;
   final List<VisitHistoryModel>? visitHistory;
+  final String? syncStatus;
+  final String? deviceUuid;
 
   PatientModel({
     required this.mrNumber,
@@ -255,10 +257,32 @@ class PatientModel {
     this.address = '',
     this.city = '',
     required this.registeredAt,
+    this.syncStatus,
+    this.deviceUuid,
     this.totalVisits = 0,
     this.visitsToday = 0,
     this.visitHistory,
   });
+
+  factory PatientModel.fromLocalMap(Map<String, dynamic> v) {
+    return PatientModel(
+      mrNumber: v['mr_number'] ?? 'PENDING',
+      deviceUuid: v['device_uuid'],
+      firstName: v['first_name'] ?? '',
+      lastName: v['last_name'] ?? '',
+      guardianName: v['guardian_name'] ?? '',
+      relation: v['guardian_relation'] ?? 'Parent',
+      gender: v['gender'] ?? 'Male',
+      phoneNumber: v['phone'] ?? '',
+      age: v['age'] is int ? v['age'] : int.tryParse(v['age']?.toString() ?? ''),
+      address: v['address'] ?? '',
+      city: v['city'] ?? '',
+      registeredAt: DateTime.tryParse(v['created_at']?.toString() ?? '') ?? DateTime.now(),
+      syncStatus: v['sync_status'],
+      totalVisits: 0,
+      visitsToday: 0,
+    );
+  }
 
   String get fullName => '$firstName $lastName'.trim();
 

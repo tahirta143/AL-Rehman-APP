@@ -21,7 +21,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.alrehmaneyehospital"
+        applicationId = "com.example.waseeladiabesity"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -42,7 +42,7 @@ android {
         outputs.all {
             // Safe cast to rename APK
             val outputImpl = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
-            outputImpl.outputFileName = "Himsadmin24feb-${buildType.name}.apk"
+            outputImpl.outputFileName = "WaseelaDiabesity-${buildType.name}.apk"
         }
     }
 }

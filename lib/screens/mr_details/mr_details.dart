@@ -336,6 +336,7 @@ class _MrDetailsBodyState extends State<_MrDetailsBody>
     if (!_formKey.currentState!.validate()) return;
     
     final prov = context.read<MrProvider>();
+    final messenger = ScaffoldMessenger.of(context);
     
     final patient = await prov.registerPatient(
       mrNumber: _mrCtrl.text,
@@ -360,19 +361,27 @@ class _MrDetailsBodyState extends State<_MrDetailsBody>
     );
 
     if (patient != null) {
-      _snack('Patient Registered Successfully!');
+      if (mounted) {
+        messenger.hideCurrentSnackBar();
+        _snack('Patient Registered Successfully!');
+      }
       
       // Auto-refresh for NEXT patient if this was a new registration
       if (_isNewPatient) {
         _clearPatient(); // This will fetchNextMR and clear fields
       } else {
-        setState(() {
-          _patient = patient;
-          _isNewPatient = false;
-        });
+        if (mounted) {
+          setState(() {
+            _patient = patient;
+            _isNewPatient = false;
+          });
+        }
       }
     } else {
-      _snack(prov.errorMessage ?? 'Failed to register patient');
+      if (mounted) {
+        messenger.hideCurrentSnackBar();
+        _snack(prov.errorMessage ?? 'Failed to register patient');
+      }
     }
   }
 
@@ -409,6 +418,7 @@ class _MrDetailsBodyState extends State<_MrDetailsBody>
   }
 
   void _snack(String msg) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Row(children: [
         const Icon(Icons.info_outline, color: Colors.white, size: 16),
@@ -1045,28 +1055,37 @@ class _MrDetailsBodyState extends State<_MrDetailsBody>
   }
 
   // ── Form Helpers ───────────────────────────────────────────────────────────
-  Widget _fixedMrField(String? mr) {
+  Widget _fixedMrField(String? autoMr) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.only(left: 4, bottom: 6),
-          child: Text('Next Assigned MR Number (Auto)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _textMid)),
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 6),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('MR Number', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _textMid)),
+              if (autoMr != null && _mrCtrl.text == autoMr)
+                const Text('Auto-generated', style: TextStyle(fontSize: 10, color: Colors.amber, fontWeight: FontWeight.bold)),
+            ],
+          ),
         ),
-        InputDecorator(
+        TextField(
+          controller: _mrCtrl,
+          focusNode: _mrFocusNode,
+          style: const TextStyle(fontSize: 16, color: _tealDark, fontWeight: FontWeight.bold, letterSpacing: 1),
           decoration: InputDecoration(
             prefixIcon: const Icon(Icons.badge_outlined, color: _teal, size: 20),
-            suffixIcon: mr == null 
+            suffixIcon: autoMr == null && _mrCtrl.text.isEmpty
               ? const Padding(padding: EdgeInsets.all(12), child: CustomLoader(size: 18, color: _teal))
-              : const Icon(Icons.lock_outline, color: _textLight, size: 18),
+              : const Icon(Icons.edit_note_rounded, color: _teal, size: 18),
+            hintText: 'Enter MR Number manually...',
+            hintStyle: TextStyle(color: Colors.grey.withOpacity(0.4), fontSize: 13, fontWeight: FontWeight.normal),
             filled: true,
             fillColor: const Color(0xFFF1F5F9),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: _border)),
-            disabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: _border.withOpacity(0.5))),
-          ),
-          child: Text(
-            mr ?? 'Fetching...',
-             style: const TextStyle(fontSize: 16, color: _tealDark, fontWeight: FontWeight.bold, letterSpacing: 1),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: _border.withOpacity(0.5))),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _teal, width: 1.5)),
           ),
         ),
       ],
@@ -1216,11 +1235,33 @@ class _SearchResultsList extends StatelessWidget {
 
     return ListView.separated(shrinkWrap: true, itemCount: results.length, separatorBuilder: (_, __) => const Divider(height: 1), itemBuilder: (_, i) {
       final p = results[i];
+      final isPending = p.syncStatus == 'pending';
       return InkWell(onTap: () => onSelect(p), child: Padding(padding: const EdgeInsets.all(12), child: Row(children: [
         CircleAvatar(radius: 18, backgroundColor: _tealLight, child: Text(p.firstName.isNotEmpty ? p.firstName[0] : '?', style: const TextStyle(color: _teal, fontWeight: FontWeight.bold, fontSize: 13))),
         const SizedBox(width: 12),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('${p.firstName} ${p.lastName}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: _textDark)),
+          Row(
+            children: [
+              Expanded(child: Text('${p.firstName} ${p.lastName}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: _textDark))),
+              if (isPending)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: Colors.orange.shade200),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.cloud_off_rounded, size: 10, color: Colors.orange.shade700),
+                      const SizedBox(width: 4),
+                      Text('Pending', style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.orange.shade700)),
+                    ],
+                  ),
+                ),
+            ],
+          ),
           Text('MR# ${p.mrNumber} · ${p.phoneNumber}', style: const TextStyle(fontSize: 11, color: _textLight)),
         ])),
         const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: _border),

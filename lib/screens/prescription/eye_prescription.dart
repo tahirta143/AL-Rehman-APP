@@ -193,10 +193,32 @@ class _EyeConsultationSidebarState extends State<_EyeConsultationSidebar> {
                         separatorBuilder: (_, __) => const Divider(height: 1),
                         itemBuilder: (context, idx) {
                           final p = provider.consultationPatients[idx];
+                          final isPending = p['sync_status'] == 'pending';
                           return ListTile(
                             dense: true,
                             onTap: () => provider.selectConsultationPatient(p, department: 'Eye'),
-                            title: Text(p['patient_name'] ?? '', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                            title: Row(
+                              children: [
+                                Expanded(child: Text(p['patient_name'] ?? '', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
+                                if (isPending)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.orange.shade50,
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(color: Colors.orange.shade200),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.cloud_off_rounded, size: 10, color: Colors.orange.shade700),
+                                        const SizedBox(width: 4),
+                                        Text('Pending', style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.orange.shade700)),
+                                      ],
+                                    ),
+                                  ),
+                              ],
+                            ),
                             subtitle: Text(p['service_detail'] ?? '', style: const TextStyle(fontSize: 10, color: kTextMid)),
                             trailing: Text(p['patient_mr_number']?.toString() ?? '', style: const TextStyle(fontSize: 10, color: Color(0xFF2563EB), fontWeight: FontWeight.bold)),
                           );

@@ -3,6 +3,8 @@ import '../../../core/services/consultation_api_service.dart';
 import '../../../core/services/opd_receipt_api_service.dart';
 import '../../../models/consultation_model/doctor_model.dart';
 import '../../../models/consultation_model/appointment_model.dart';
+import '../../../core/services/connectivity_service.dart';
+import '../../../core/utils/database_helper.dart';
 
 // ─────────────────────────────────────────────
 //  PROVIDER
@@ -10,6 +12,8 @@ import '../../../models/consultation_model/appointment_model.dart';
 class ConsultationProvider extends ChangeNotifier {
   final ConsultationApiService _apiService = ConsultationApiService();
   final OpdReceiptApiService _opdApiService = OpdReceiptApiService();
+  final ConnectivityService _connectivity = ConnectivityService();
+  final DatabaseHelper _db = DatabaseHelper();
 
   // ── Service Doctor Mappings ──
   Map<String, dynamic> _serviceDocs = {};
@@ -42,65 +46,124 @@ class ConsultationProvider extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
 
-    final mappingsResult = await _apiService.fetchServiceDoctorMappings();
-    final opdServicesResult = await _opdApiService.fetchOpdServices();
-
-    if (mappingsResult.success && mappingsResult.data != null) {
-      _serviceDocs = mappingsResult.data!;
-    }
-    if (opdServicesResult.success) {
-      for (var s in opdServicesResult.services) {
-        if (s.serviceName.toLowerCase().contains('consultation')) {
-          _consultationSrlNo = s.srlNo.toString();
-          break;
-        }
-      }
+    bool loadFromLocal = false;
+    if (!_connectivity.isOnline.value) {
+      loadFromLocal = true;
     }
 
-    final result = await _apiService.fetchDoctors(isPublic: isPublic);
+    try {
+      if (!loadFromLocal) {
+        try {
+          final mappingsResult = await _apiService.fetchServiceDoctorMappings().timeout(const Duration(seconds: 5));
+          final opdServicesResult = await _opdApiService.fetchOpdServices().timeout(const Duration(seconds: 5));
 
-    if (result.success) {
-      // Convert DoctorModel to DoctorInfo
-      _doctors = result.doctors.map((doctor) {
-        // Count appointments for this doctor (only if we have appointments loaded)
-        final appointmentCount = _appointments
-            .where((a) => a.consultantName == 'Dr. ${doctor.doctorName}')
-            .length;
-
-        // Parity Fix: Resolve dynamic fees
-        double fee = double.tryParse(doctor.consultationFee) ?? 0.0;
-        double followUpFee = (fee * 0.7).floorToDouble();
-
-        final lookupKey = _consultationSrlNo ?? 'Consultation';
-        if (_serviceDocs.containsKey(lookupKey)) {
-          final mappings = _serviceDocs[lookupKey] as List<dynamic>;
-          final match = mappings.firstWhere(
-            (m) => m['doctor_srl_no'].toString() == doctor.srlNo.toString(),
-            orElse: () => null,
-          );
-          if (match != null) {
-            if (match['rate'] != null) {
-              fee = double.tryParse(match['rate'].toString()) ?? fee;
-            }
-            final fUpDays = int.tryParse(match['followup_days']?.toString() ?? '0') ?? 0;
-            if (fUpDays > 0) {
-              followUpFee = 0;
-            } else {
-              followUpFee = (fee * 0.7).floorToDouble();
+          if (mappingsResult.success && mappingsResult.data != null) {
+            _serviceDocs = mappingsResult.data!;
+          }
+          if (opdServicesResult.success) {
+            for (var s in opdServicesResult.services) {
+              if (s.serviceName.toLowerCase().contains('consultation')) {
+                _consultationSrlNo = s.srlNo.toString();
+                break;
+              }
             }
           }
-        }
 
-        return doctor.toDoctorInfo(
-          totalAppointments: appointmentCount,
-          customFee: fee.toStringAsFixed(0),
-          customFollowUp: followUpFee.toStringAsFixed(0),
-        );
-      }).toList();
-      _errorMessage = null;
-    } else {
-      _errorMessage = result.message;
-      _doctors = [];
+          final result = await _apiService.fetchDoctors(isPublic: isPublic).timeout(const Duration(seconds: 10));
+
+          if (result.success && result.doctors.isNotEmpty) {
+            _doctors = result.doctors.map((doctor) {
+              final appointmentCount = _appointments
+                  .where((a) => a.consultantName == 'Dr. ${doctor.doctorName}')
+                  .length;
+
+              double fee = double.tryParse(doctor.consultationFee) ?? 0.0;
+              double followUpFee = (fee * 0.7).floorToDouble();
+
+              final lookupKey = _consultationSrlNo ?? 'Consultation';
+              if (_serviceDocs.containsKey(lookupKey)) {
+                final mappings = _serviceDocs[lookupKey] as List<dynamic>;
+                final match = mappings.firstWhere(
+                  (m) => m['doctor_srl_no'].toString() == doctor.srlNo.toString(),
+                  orElse: () => null,
+                );
+                if (match != null) {
+                  if (match['rate'] != null) {
+                    fee = double.tryParse(match['rate'].toString()) ?? fee;
+                  }
+                  final fUpDays = int.tryParse(match['followup_days']?.toString() ?? '0') ?? 0;
+                  if (fUpDays > 0) {
+                    followUpFee = 0;
+                  } else {
+                    followUpFee = (fee * 0.7).floorToDouble();
+                  }
+                }
+              }
+
+              return doctor.toDoctorInfo(
+                totalAppointments: appointmentCount,
+                customFee: fee.toStringAsFixed(0),
+                customFollowUp: followUpFee.toStringAsFixed(0),
+              );
+            }).toList();
+            _errorMessage = null;
+            _isLoading = false;
+            notifyListeners();
+            return;
+          } else {
+            loadFromLocal = true;
+          }
+        } catch (e) {
+          debugPrint('⚠️ Doctor API load failed: $e. Falling back to local.');
+          loadFromLocal = true;
+        }
+      }
+
+      if (loadFromLocal) {
+        final localDocs = await _db.queryAll('master_doctors');
+        if (localDocs.isNotEmpty) {
+          _doctors = localDocs.map((d) {
+            final fee = d['consultation_fee']?.toString() ?? '0';
+            final parsedFee = double.tryParse(fee) ?? 0.0;
+            final followUp = d['follow_up_fee']?.toString() ?? (parsedFee * 0.7).floor().toString();
+            final srlNo = int.tryParse(d['srl_no']?.toString() ?? '0') ?? 0;
+            
+            // Generate avatar color dynamically based on ID
+            final avatarColors = [
+              const Color(0xFF00B5AD), const Color(0xFF8E24AA), const Color(0xFF1E88E5), 
+              const Color(0xFFE53935), const Color(0xFF43A047), const Color(0xFFF4511E)
+            ];
+            final color = avatarColors[srlNo % avatarColors.length];
+
+            final timings = d['doctor_timings']?.toString() ?? '';
+            
+            return DoctorInfo(
+              id: srlNo.toString(),
+              name: 'Dr. ${d['doctor_name']}',
+              specialty: d['doctor_specialization']?.toString() ?? 'Medical Officer',
+              consultationFee: (fee.isEmpty || fee == '0') ? '0' : fee,
+              followUpCharges: (followUp.isEmpty || followUp == '0') ? '0' : followUp,
+              availableDays: (d['available_days']?.toString() ?? 'Mon,Tue,Wed,Thu,Fri,Sat,Sun')
+                  .split(',')
+                  .map((e) => e.trim())
+                  .where((e) => e.isNotEmpty)
+                  .toList(),
+              timings: timings.isEmpty ? '09:00 AM - 05:00 PM' : timings,
+              hospital: d['hospital_name']?.toString() ?? 'Hospital',
+              imageAsset: d['image_url']?.toString() ?? '',
+              department: d['doctor_department']?.toString() ?? '',
+              avatarColor: color,
+              totalAppointments: 0,
+            );
+          }).toList();
+          _errorMessage = null;
+        } else {
+          _errorMessage = 'No doctors available offline. Please Bootstrap while online.';
+        }
+      }
+    } catch (e) {
+      debugPrint('Error in loadDoctors: $e');
+      _errorMessage = 'Failed to load doctors: $e';
     }
 
     _isLoading = false;
@@ -153,6 +216,62 @@ class ConsultationProvider extends ChangeNotifier {
       }).toList();
     } else {
       _appointments = [];
+    }
+
+    // Load local appointments (both pending and synced)
+    try {
+      final db = await _db.database;
+      final localRows = await db.query('appointments_local');
+      
+      for (var app in localRows) {
+        final deviceId = app['device_uuid']?.toString() ?? '';
+        
+        // Prevent duplicates if already in _appointments from API
+        if (_appointments.any((a) => a.id == deviceId)) continue;
+
+        final docId = app['doctor_srl_no']?.toString() ?? '';
+        final doctor = _doctors.firstWhere(
+          (d) => d.id == docId,
+          orElse: () => DoctorInfo(
+            id: docId,
+            name: 'Dr. ID: $docId',
+            specialty: 'Doctor',
+            consultationFee: app['fee']?.toString() ?? '0',
+            followUpCharges: app['follow_up_charges']?.toString() ?? '0',
+            availableDays: [],
+            timings: '09:00 AM - 05:00 PM',
+            hospital: 'Hospital (Offline)',
+            imageAsset: '',
+            department: '',
+            avatarColor: Colors.grey,
+            totalAppointments: 0,
+          ),
+        );
+
+        final appointment = ConsultationAppointment(
+          id: deviceId,
+          patientName: app['patient_name']?.toString() ?? 'Local Patient',
+          mrNo: app['mr_number']?.toString() ?? '',
+          contactNo: app['patient_contact']?.toString() ?? '',
+          address: app['patient_address']?.toString() ?? '',
+          consultantName: doctor.name,
+          specialty: doctor.specialty,
+          consultationFee: app['fee']?.toString() ?? doctor.consultationFee,
+          followUpCharges: app['follow_up_charges']?.toString() ?? doctor.followUpCharges,
+          availableDays: doctor.availableDays,
+          timings: doctor.timings,
+          timeSlot: app['appointment_time']?.toString() ?? '',
+          appointmentDate: DateTime.tryParse(app['appointment_date']?.toString() ?? '') ?? DateTime.now(),
+          status: app['sync_status'] == 'pending' ? 'Pending' : 'Upcoming',
+          hospital: doctor.hospital,
+          type: 'OPD',
+          isFirstVisit: app['is_first_visit'] == 1,
+          tokenNumber: app['token_number'] as int?,
+        );
+        _appointments.insert(0, appointment);
+      }
+    } catch (e) {
+      debugPrint('Error loading local appointments in consultation provider: $e');
     }
 
     _isLoadingAppointments = false;
@@ -251,6 +370,67 @@ class ConsultationProvider extends ChangeNotifier {
 
     // Convert to API request format
     final requestData = appointment.toApiRequest(doctorSrlNo);
+
+    if (!_connectivity.isOnline.value) {
+      debugPrint('📴 Offline: Saving appointment locally');
+      final db = await _db.database;
+      final dateStr = appointment.appointmentDate.toIso8601String().substring(0, 10);
+      final uuid = 'OFF-${DateTime.now().millisecondsSinceEpoch}';
+
+      // Calculate offline token number
+      final existingLocal = await db.query(
+        'appointments_local',
+        where: 'doctor_srl_no = ? AND appointment_date LIKE ?',
+        whereArgs: [doctorSrlNo, '$dateStr%'],
+      );
+      final nextToken = existingLocal.length + 1;
+
+      final appData = {
+        'device_uuid': uuid,
+        'mr_number': appointment.mrNo,
+        'patient_name': appointment.patientName,
+        'patient_contact': appointment.contactNo,
+        'patient_address': appointment.address,
+        'doctor_srl_no': doctorSrlNo,
+        'appointment_date': appointment.appointmentDate.toIso8601String(),
+        'appointment_time': appointment.timeSlot,
+        'fee': appointment.consultationFee,
+        'follow_up_charges': appointment.followUpCharges,
+        'is_first_visit': appointment.isFirstVisit ? 1 : 0,
+        'token_number': nextToken,
+        'reason': 'OPD Consultation',
+        'sync_status': 'pending',
+        'created_at': DateTime.now().toIso8601String(),
+      };
+      
+      await db.insert('appointments_local', appData);
+      
+      // Update UI with token and doctor info
+      final offlineApp = ConsultationAppointment(
+        id: uuid,
+        patientName: appointment.patientName,
+        mrNo: appointment.mrNo,
+        contactNo: appointment.contactNo,
+        address: appointment.address,
+        consultantName: doctor.name,
+        specialty: doctor.specialty,
+        consultationFee: appointment.consultationFee,
+        followUpCharges: appointment.followUpCharges,
+        availableDays: doctor.availableDays,
+        timings: doctor.timings,
+        timeSlot: appointment.timeSlot,
+        appointmentDate: appointment.appointmentDate,
+        status: 'Pending',
+        hospital: doctor.hospital,
+        type: appointment.type,
+        isFirstVisit: appointment.isFirstVisit,
+        tokenNumber: nextToken,
+      );
+
+      _appointments.insert(0, offlineApp);
+      notifyListeners();
+      return true;
+    }
 
     // Call API
     final result = await _apiService.createAppointment(requestData);

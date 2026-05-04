@@ -1,14 +1,22 @@
 import 'package:flutter/material.dart';
+import '../../core/services/connectivity_service.dart';
+import '../../core/services/auth_storage_service.dart';
+import '../../core/utils/database_helper.dart';
 import '../../core/services/mr_api_service.dart';
 import '../../core/services/prescription_api_service.dart';
 import '../../core/services/vitals_api_service.dart';
 import '../../models/mr_model/mr_patient_model.dart';
 import '../../models/vitals_model/vitals_model.dart';
+import 'dart:convert';
+import 'package:uuid/uuid.dart';
 
 class VitalsProvider extends ChangeNotifier {
   final VitalsApiService _apiService = VitalsApiService();
   final MrApiService _mrApiService = MrApiService();
   final PrescriptionApiService _prescriptionApiService = PrescriptionApiService();
+  final ConnectivityService _connectivity = ConnectivityService();
+  final DatabaseHelper _db = DatabaseHelper();
+  final AuthStorageService _storage = AuthStorageService();
 
   bool _isLoading = false;
   bool _isSaving = false;
@@ -84,21 +92,66 @@ class VitalsProvider extends ChangeNotifier {
     notifyListeners();
 
     final mr = mrNumber.trim();
+    bool foundOnline = false;
 
     try {
-      final res = await _mrApiService.fetchPatientByMR(mr);
-      if (res.success && res.patient != null) {
-        _currentPatient = res.patient!.toPatientModel();
-        await _fetchVitalsHistory(mr, customReceiptId);
-      } else {
-        _errorMessage = res.message ?? 'Patient not found';
+      if (_connectivity.isOnline.value) {
+        final res = await _mrApiService.fetchPatientByMR(mr);
+        if (res.success && res.patient != null) {
+          _currentPatient = res.patient!.toPatientModel();
+          foundOnline = true;
+          await _fetchVitalsHistory(mr, customReceiptId);
+        }
+      }
+
+      if (!foundOnline) {
+        // 📴 Search in local database
+        debugPrint('📴 Patient not found online or offline mode. Searching local DB for $mr...');
+        final db = await _db.database;
+        
+        // 1. Check patients_local
+        final localRows = await db.query(
+          'patients_local', 
+          where: 'mr_number = ? OR device_uuid = ?', 
+          whereArgs: [mr, mr]
+        );
+        
+        if (localRows.isNotEmpty) {
+          _currentPatient = PatientModel.fromLocalMap(localRows.first);
+          debugPrint('✅ Found patient in patients_local: ${_currentPatient?.fullName}');
+        } else {
+          // 2. Check cached_consultations (from today's online sync)
+          final cachedRows = await db.query(
+            'cached_consultations',
+            where: 'patient_mr_number = ?',
+            whereArgs: [mr]
+          );
+          if (cachedRows.isNotEmpty) {
+            final c = cachedRows.first;
+            _currentPatient = PatientModel(
+              mrNumber: c['patient_mr_number']?.toString() ?? '',
+              firstName: c['patient_name']?.toString() ?? 'Patient',
+              lastName: '',
+              gender: 'Male', // Default if unknown
+              registeredAt: DateTime.now(),
+            );
+            _receiptId ??= c['receipt_id']?.toString();
+            _doctorName ??= c['doctor_name']?.toString();
+            _tokenNumber ??= c['token_number']?.toString();
+            debugPrint('✅ Found patient in cached_consultations');
+          }
+        }
+      }
+
+      if (_currentPatient == null && _errorMessage == null) {
+        _errorMessage = 'Patient not found locally or online';
       }
     } catch (e) {
       _errorMessage = 'Error searching patient: $e';
     } finally {
       _isLoading = false;
       notifyListeners();
-      _calculateBmiAndBmr(); // Re-calculate BMR when patient data changes
+      _calculateBmiAndBmr();
     }
   }
 
@@ -200,14 +253,47 @@ class VitalsProvider extends ChangeNotifier {
     _isLoadingConsultations = true;
     notifyListeners();
     try {
-      final res = await _prescriptionApiService.fetchConsultationPatients();
-      if (res['success'] == true) {
-        final List list = res['data'] ?? [];
-        // Filter out Eye department fixed in plans
-        _consultationPatients = list.where((cp) {
-          final dept = cp['doctor_department']?.toString().toLowerCase() ?? '';
-          return !dept.contains('eye');
+      if (_connectivity.isOnline.value) {
+        final res = await _prescriptionApiService.fetchConsultationPatients();
+        if (res['success'] == true) {
+          final List list = res['data'] ?? [];
+          // Filter out Eye department fixed in plans
+          _consultationPatients = list.where((cp) {
+            final dept = cp['doctor_department']?.toString().toLowerCase() ?? '';
+            return !dept.contains('eye');
+          }).toList();
+
+          // 💾 Save to local cache
+          final db = await _db.database;
+          await db.delete('cached_consultations'); // Clear old
+          for (var cp in _consultationPatients) {
+            await db.insert('cached_consultations', {
+              'patient_mr_number': cp['patient_mr_number'],
+              'patient_name': cp['patient_name'],
+              'receipt_id': cp['receipt_id'],
+              'doctor_name': cp['doctor_name'],
+              'service_detail': cp['service_detail'],
+              'token_number': cp['token_number'],
+              'doctor_department': cp['doctor_department'],
+              'cached_at': DateTime.now().toIso8601String(),
+            });
+          }
+          debugPrint('💾 Cached ${_consultationPatients.length} consultations');
+        }
+      } else {
+        // 📴 Load from cache
+        final db = await _db.database;
+        final rows = await db.query('cached_consultations');
+        _consultationPatients = rows.map((r) => {
+          'patient_mr_number': r['patient_mr_number'],
+          'patient_name': r['patient_name'],
+          'receipt_id': r['receipt_id'],
+          'doctor_name': r['doctor_name'],
+          'service_detail': r['service_detail'],
+          'token_number': r['token_number'],
+          'doctor_department': r['doctor_department'],
         }).toList();
+        debugPrint('📴 Loaded ${_consultationPatients.length} consultations from cache');
       }
     } catch (e) {
       debugPrint('Error consultations: $e');
@@ -243,9 +329,42 @@ class VitalsProvider extends ChangeNotifier {
         painScale: _painScale,
       );
 
-      final res = await _apiService.saveVitals(model.toJson());
-      return res['success'] == true;
+      if (_connectivity.isOnline.value) {
+        final res = await _apiService.saveVitals(model.toJson());
+        return res['success'] == true;
+      } else {
+        // 📴 Save locally
+        debugPrint('📴 Offline: Saving vitals to local database...');
+        final db = await _db.database;
+        final uuid = const Uuid().v4();
+        
+        await db.insert('vitals_local', {
+          'device_uuid': uuid,
+          'patient_uuid': _currentPatient!.deviceUuid ?? _currentPatient!.mrNumber,
+          'mr_number': _currentPatient!.mrNumber == 'PENDING' ? null : _currentPatient!.mrNumber,
+          'visit_uuid': _receiptId ?? '',
+          'weight': model.weight,
+          'height': model.height,
+          'bsr': model.bsr,
+          'systolic': model.systolic,
+          'diastolic': model.diastolic,
+          'pulse': model.pulse,
+          'temp': model.temperature,
+          'spo2': model.spo2,
+          'bmi': model.bmi,
+          'bmr': model.bmr,
+          'waist': model.waist,
+          'hip': model.hip,
+          'whr': model.whr,
+          'pain_scale': model.painScale,
+          'sync_status': 'pending',
+          'created_at': DateTime.now().toIso8601String(),
+        });
+        
+        return true;
+      }
     } catch (e) {
+      debugPrint('❌ Error saving vitals: $e');
       return false;
     } finally {
       _isSaving = false;

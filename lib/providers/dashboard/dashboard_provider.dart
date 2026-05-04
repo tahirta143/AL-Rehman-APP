@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../../core/services/auth_storage_service.dart';
 import '../../global/global_api.dart';
 import '../../models/dashboard_model.dart';
+import '../../core/utils/database_helper.dart';
 
 class DashboardProvider extends ChangeNotifier {
   final AuthStorageService _storage = AuthStorageService();
@@ -415,7 +416,51 @@ class DashboardProvider extends ChangeNotifier {
         }
       }
     } catch (e) {
-      developer.log('Error fetching calendar data: $e', name: 'DashboardProvider');
+      developer.log('Error fetching calendar data from API: $e', name: 'DashboardProvider');
+    }
+
+    // Load local appointments and merge into calendar
+    try {
+      final db = await DatabaseHelper().database;
+      
+      // Load doctors mapping for name resolution
+      final doctorRows = await db.query('master_doctors');
+      final doctorMap = {
+        for (var d in doctorRows) 
+          d['srl_no'].toString(): d['doctor_name']?.toString() ?? 'Dr. Unknown'
+      };
+
+      final localRows = await db.query('appointments_local');
+      
+      for (var row in localRows) {
+        final dateStr = DateTime.tryParse(row['appointment_date']?.toString() ?? '')
+            ?.toIso8601String().split('T')[0];
+        if (dateStr == null) continue;
+
+        final docSrlNo = row['doctor_srl_no']?.toString() ?? '';
+        final doctorName = doctorMap[docSrlNo] ?? 'Dr. ID: $docSrlNo';
+
+        _calendarData.putIfAbsent(dateStr, () => {});
+        _calendarData[dateStr]!.putIfAbsent(doctorName, () => []);
+        
+        // Prevent duplicates if already there (unlikely for offline but safe)
+        final alreadyPresent = _calendarData[dateStr]![doctorName]!
+            .any((a) => a['device_uuid'] == row['device_uuid']);
+            
+        if (!alreadyPresent) {
+          _calendarData[dateStr]![doctorName]!.add({
+            'appointment_date': row['appointment_date'],
+            'doctor_name': doctorName,
+            'patient_name': row['patient_name'],
+            'slot_time': row['appointment_time'],
+            'token_number': row['token_number'],
+            'sync_status': row['sync_status'],
+            'device_uuid': row['device_uuid'],
+          });
+        }
+      }
+    } catch (e) {
+      developer.log('Error loading local appointments for calendar: $e', name: 'DashboardProvider');
     }
 
     _isCalendarLoading = false;

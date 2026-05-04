@@ -226,32 +226,50 @@ class _ConsultationSidebarState extends State<_ConsultationSidebar> {
                           return ListTile(
                             dense: true,
                             onTap: () => provider.selectConsultationPatient(p),
-                            title: Row(
-                              children: [
-                                Expanded(child: Text(p['patient_name'] ?? '', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
-                                if (p['token_number'] != null) ...[
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: kTeal,
-                                      borderRadius: BorderRadius.circular(12),
-                                      boxShadow: [
-                                        BoxShadow(color: kTeal.withOpacity(0.3), blurRadius: 4, offset: const Offset(0, 1)),
-                                      ],
-                                    ),
-                                    child: Text(
-                                      '#${p['token_number']}',
-                                      style: const TextStyle(
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.w900,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                ],
-                              ],
-                            ),
+                             title: Row(
+                               children: [
+                                 Expanded(child: Text(p['patient_name'] ?? '', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
+                                 if (p['sync_status'] == 'pending') ...[
+                                   Container(
+                                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                     decoration: BoxDecoration(
+                                       color: Colors.orange.shade50,
+                                       borderRadius: BorderRadius.circular(4),
+                                       border: Border.all(color: Colors.orange.shade200),
+                                     ),
+                                     child: Row(
+                                       mainAxisSize: MainAxisSize.min,
+                                       children: [
+                                         Icon(Icons.cloud_off_rounded, size: 10, color: Colors.orange.shade700),
+                                         const SizedBox(width: 4),
+                                         Text('Pending', style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.orange.shade700)),
+                                       ],
+                                     ),
+                                   ),
+                                   const SizedBox(width: 8),
+                                 ] else if (p['token_number'] != null) ...[
+                                   Container(
+                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                     decoration: BoxDecoration(
+                                       color: kTeal,
+                                       borderRadius: BorderRadius.circular(12),
+                                       boxShadow: [
+                                         BoxShadow(color: kTeal.withOpacity(0.3), blurRadius: 4, offset: const Offset(0, 1)),
+                                       ],
+                                     ),
+                                     child: Text(
+                                       '#${p['token_number']}',
+                                       style: const TextStyle(
+                                         fontSize: 9,
+                                         fontWeight: FontWeight.w900,
+                                         color: Colors.white,
+                                       ),
+                                     ),
+                                   ),
+                                   const SizedBox(width: 8),
+                                 ],
+                               ],
+                             ),
                             subtitle: Text(p['service_detail'] ?? '', style: const TextStyle(fontSize: 10, color: kTextMid)),
                             trailing: Text(p['patient_mr_number']?.toString() ?? '', style: const TextStyle(fontSize: 10, color: Color(0xFF2563EB), fontWeight: FontWeight.bold)),
                           );

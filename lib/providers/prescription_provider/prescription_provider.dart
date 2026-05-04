@@ -1,8 +1,13 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../core/services/pdf_eye_prescription_service.dart';
 import '../../core/services/prescription_api_service.dart';
 import '../../core/services/mr_api_service.dart';
 import '../../core/services/vitals_api_service.dart';
+import '../../models/vitals_model/vitals_model.dart';
+import '../../core/services/connectivity_service.dart';
+import '../../core/services/camp_sync_service.dart';
+import '../../core/utils/database_helper.dart';
 import '../../models/mr_model/mr_patient_model.dart';
 import '../../models/prescription_model/prescription_model.dart';
 import '../../models/vitals_model/vitals_model.dart';
@@ -11,6 +16,9 @@ class PrescriptionProvider extends ChangeNotifier {
   final PrescriptionApiService _apiService = PrescriptionApiService();
   final MrApiService _mrApiService = MrApiService();
   final VitalsApiService _vitalsApiService = VitalsApiService();
+  final ConnectivityService _connectivity = ConnectivityService();
+  final CampSyncService _syncService = CampSyncService();
+  final DatabaseHelper _db = DatabaseHelper();
 
   // ─── Loading States ───────────────────────────────────────────────
   bool _isLoading = false;
@@ -182,10 +190,39 @@ class PrescriptionProvider extends ChangeNotifier {
     _isLoadingPatients = true;
     notifyListeners();
     await loadEyeSetupItems();
-    final res = await _apiService.fetchConsultationPatients();
-    if (res['success'] == true) {
-      _consultationPatients = res['data'] ?? [];
+
+    try {
+      // 1. Load local pending visits
+      final localVisits = await _db.queryAll('visits_local');
+      final List<dynamic> merged = localVisits
+          .where((v) => v['sync_status'] == 'pending')
+          .map((v) => {
+                'patient_mr_number': v['patient_uuid'],
+                'patient_name': v['patient_name'],
+                'receipt_id': v['receipt_id'],
+                'service_detail': v['opd_service'],
+                'date': v['date'],
+                'status': 'Pending Sync',
+              })
+          .toList();
+
+      // 2. Load Online
+      if (_connectivity.isOnline.value) {
+        try {
+          final res = await _apiService.fetchConsultationPatients().timeout(const Duration(seconds: 10));
+          if (res['success'] == true) {
+            merged.addAll(res['data'] as List? ?? []);
+          }
+        } catch (e) {
+          debugPrint('⚠️ Online consultation patients load failed: $e');
+        }
+      }
+
+      _consultationPatients = merged;
+    } catch (e) {
+      debugPrint('Error merging consultation patients: $e');
     }
+
     _isLoadingPatients = false;
     notifyListeners();
   }
@@ -248,6 +285,20 @@ class PrescriptionProvider extends ChangeNotifier {
       return;
     }
     
+    if (!_connectivity.isOnline.value) {
+      debugPrint('📴 App is OFFLINE. Searching medicines in local DB.');
+      final localMeds = await _db.queryAll('master_medicines');
+      _medicineSearchResults = localMeds.where((m) => 
+        (m['name'] ?? '').toString().toLowerCase().contains(query.toLowerCase())
+      ).map((m) => {
+        'id': m['id'],
+        'medicine_name': m['name'],
+        'formula': m['is_formula'],
+      }).toList();
+      notifyListeners();
+      return;
+    }
+
     final res = await _apiService.searchMedicines(query);
     if (res['success'] == true) {
       _medicineSearchResults = res['data'] ?? [];
@@ -262,15 +313,37 @@ class PrescriptionProvider extends ChangeNotifier {
     notifyListeners();
 
     final mr = mrNumber.trim();
+    bool foundOnline = false;
 
-    final result = await _mrApiService.fetchPatientByMR(mr);
-    if (result.success && result.patient != null) {
-      _currentPatient = result.patient!.toPatientModel();
-      await fetchDiagnosis(department ?? 'General'); 
-      await fetchVitals(mr, receiptId: _receiptId);
-      await fetchHistory(mr);
-    } else {
-      _errorMessage = result.message ?? 'Patient not found';
+    if (_connectivity.isOnline.value) {
+      final result = await _mrApiService.fetchPatientByMR(mr);
+      if (result.success && result.patient != null) {
+        _currentPatient = result.patient!.toPatientModel();
+        foundOnline = true;
+        await fetchDiagnosis(department ?? 'General'); 
+        await fetchVitals(mr, receiptId: _receiptId);
+        await fetchHistory(mr);
+      }
+    }
+
+    if (!foundOnline) {
+      // 📴 Search locally
+      debugPrint('📴 Prescription search: searching local DB for $mr');
+      final db = await _db.database;
+      final localRows = await db.query(
+        'patients_local',
+        where: 'mr_number = ? OR device_uuid = ?',
+        whereArgs: [mr, mr]
+      );
+
+      if (localRows.isNotEmpty) {
+        _currentPatient = PatientModel.fromLocalMap(localRows.first);
+        debugPrint('✅ Found patient locally: ${_currentPatient?.fullName}');
+      }
+    }
+
+    if (_currentPatient == null) {
+      _errorMessage = 'Patient not found locally or online';
     }
     _isLoading = false;
     notifyListeners();
@@ -469,10 +542,49 @@ class PrescriptionProvider extends ChangeNotifier {
       eyeDetails: isEye ? _buildEyeDetails() : null,
     );
 
-    final res = await _apiService.savePrescription(prescription.toJson());
+    bool isSuccess = false;
+    if (_connectivity.isOnline.value) {
+      final res = await _apiService.savePrescription(prescription.toJson());
+      isSuccess = res['success'] == true || res['status'] == true;
+    } else {
+      debugPrint('📴 App is OFFLINE. Saving prescription locally.');
+      
+      final visitUuid = _syncService.generateUuid();
+      
+      // 1. Save Vitals
+      await _db.insert('vitals_local', {
+        'device_uuid': _syncService.generateUuid(),
+        'patient_uuid': _currentPatient!.deviceUuid ?? _currentPatient!.mrNumber,
+        'mr_number': _currentPatient!.mrNumber == 'PENDING' ? null : _currentPatient!.mrNumber,
+        'visit_uuid': visitUuid,
+        'bsr': double.tryParse(vitalControllers['blood']?.text ?? '0') ?? 0.0,
+        'systolic': double.tryParse(vitalControllers['bp']?.text.split('/')[0] ?? '0') ?? 0.0,
+        'diastolic': double.tryParse(vitalControllers['bp']?.text.split('/').last ?? '0') ?? 0.0,
+        'pulse': double.tryParse(vitalControllers['pulse']?.text ?? '0') ?? 0.0,
+        'weight': double.tryParse(vitalControllers['weight']?.text ?? '0') ?? 0.0,
+        'temp': double.tryParse(vitalControllers['temp']?.text ?? '0') ?? 0.0,
+        'sync_status': 'pending',
+        'created_at': DateTime.now().toIso8601String(),
+      });
+
+      // 2. Save Prescription
+      await _db.insert('prescriptions_local', {
+        'device_uuid': _syncService.generateUuid(),
+        'patient_uuid': _currentPatient!.deviceUuid ?? _currentPatient!.mrNumber,
+        'mr_number': _currentPatient!.mrNumber == 'PENDING' ? null : _currentPatient!.mrNumber,
+        'visit_uuid': visitUuid,
+        'doctor_srl_no': doctorSrlNo,
+        'treatment': prescription.treatment,
+        'medicines_json': jsonEncode(prescription.medicines),
+        'investigations_json': jsonEncode(prescription.investigations),
+        'sync_status': 'pending',
+        'created_at': DateTime.now().toIso8601String(),
+      });
+
+      isSuccess = true;
+    }
     
     _isSaving = false;
-    final bool isSuccess = res['success'] == true || res['status'] == true;
     
     if (isSuccess) {
       _lastSavedPrescription = prescription;

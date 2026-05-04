@@ -28,6 +28,7 @@ class AuthStorageService {
   static const _keyRole        = 'role';
   static const _keyPermissions = 'permissions';
   static const _keyPermVersion = 'permissions_version';
+  static const _keyCampToken    = 'camp_device_token';
 
   // ─── Save after login ───────────────────────────────────────────────
   Future<void> saveLoginData({
@@ -66,6 +67,11 @@ class AuthStorageService {
   Future<String?> getUserId()   => _safeRead(_keyUserId);
   Future<String?> getUsername() => _safeRead(_keyUsername);
   Future<String?> getFullName() => _safeRead(_keyFullName);
+  Future<String?> getCampToken() => _safeRead(_keyCampToken);
+
+  Future<void> saveCampToken(String token) async {
+    await _storage.write(key: _keyCampToken, value: token);
+  }
 
   Future<List<String>> getPermissions() async {
     final raw = await _safeRead(_keyPermissions);

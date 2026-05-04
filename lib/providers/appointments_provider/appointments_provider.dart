@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import '../../core/services/auth_storage_service.dart';
 import '../../global/global_api.dart';
 import '../../models/appointment_model/appointments_model.dart';
+import '../../core/utils/database_helper.dart';
 
 class AppointmentsProvider extends ChangeNotifier {
   static const String _baseUrl = '${GlobalApi.baseUrl}/appointments';
@@ -196,6 +197,58 @@ class AppointmentsProvider extends ChangeNotifier {
       errorMessage = 'Network error. Check your connection.';
       developer.log('💥 $e',
           name: 'AppointmentsProvider', error: e, stackTrace: stack);
+    }
+
+    // Load local appointments (both pending and synced)
+    try {
+      final db = await DatabaseHelper().database;
+      
+      // Load doctors mapping for offline name resolution
+      final doctorRows = await db.query('master_doctors');
+      final doctorMap = {
+        for (var d in doctorRows) 
+          d['srl_no'].toString(): {
+            'name': d['doctor_name']?.toString() ?? 'Dr. Unknown',
+            'specialty': d['doctor_specialization']?.toString() ?? 'Consultant'
+          }
+      };
+
+      final localRows = await db.query('appointments_local');
+      
+      for (var row in localRows) {
+        final deviceId = row['device_uuid']?.toString() ?? '';
+        // Avoid duplicates if already in _all from API
+        if (_all.any((a) => a.appointmentId == deviceId)) continue;
+
+        final docSrlNo = row['doctor_srl_no']?.toString() ?? '';
+        final docInfo = doctorMap[docSrlNo] ?? {
+          'name': 'Dr. ID: $docSrlNo',
+          'specialty': 'Consultant'
+        };
+
+        _all.insert(0, AppointmentModel(
+          id: 0, 
+          appointmentId: deviceId,
+          mrNumber: row['mr_number']?.toString() ?? '',
+          patientName: row['patient_name']?.toString() ?? 'Local Patient',
+          patientContact: row['patient_contact']?.toString() ?? '',
+          doctorSrlNo: int.tryParse(docSrlNo) ?? 0,
+          doctorName: docInfo['name']!,
+          appointmentDate: row['appointment_date']?.toString() ?? DateTime.now().toIso8601String(),
+          slotTime: row['appointment_time']?.toString() ?? '',
+          status: row['sync_status'] == 'pending' ? 'pending' : 'booked',
+          isFirstVisit: row['is_first_visit'] == 1,
+          fee: double.tryParse(row['fee']?.toString() ?? '0') ?? 0.0,
+          followUpCharges: double.tryParse(row['follow_up_charges']?.toString() ?? '0') ?? 0.0,
+          createdAt: row['created_at']?.toString() ?? DateTime.now().toIso8601String(),
+          doctorSpecialization: docInfo['specialty']!,
+          consultationTimeFrom: '',
+          consultationTimeTo: '',
+          tokenNumber: row['token_number'] as int?,
+        ));
+      }
+    } catch (e) {
+      debugPrint('Error loading local appointments in provider: $e');
     }
 
     isLoading = false;

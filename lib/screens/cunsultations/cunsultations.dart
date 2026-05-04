@@ -487,7 +487,10 @@ class _DoctorCard extends StatelessWidget {
                               const SizedBox(width: 10),
                               ...weekDates.map((date) {
                                 final dayName = shortDayNames[date.weekday - 1];
-                                final isAvailable = doctor.availableDays.contains(dayName);
+                                final fullDayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+                                final fullDayName = fullDayNames[date.weekday - 1];
+                                final isAvailable = doctor.availableDays.contains(dayName) || 
+                                                    doctor.availableDays.contains(fullDayName);
                                 return Container(
                                   width: 28,
                                   height: 28,
