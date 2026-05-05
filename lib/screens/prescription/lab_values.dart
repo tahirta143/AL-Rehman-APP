@@ -10,6 +10,7 @@ import 'widgets/lab_values_sheet.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:animate_do/animate_do.dart';
 import '../../custum widgets/custom_loader.dart';
+import '../../core/utils/wait_time_helper.dart';
 
 class LabValuesScreen extends StatefulWidget {
   const LabValuesScreen({super.key});
@@ -298,12 +299,61 @@ class _ConsultationSidebar extends StatelessWidget {
                               .where((p) => !(p['doctor_department']?.toString().toLowerCase().contains('eye') ?? false))
                               .toList();
                           final p = filtered[idx];
+                          final waitTime = WaitTimeHelper.getWaitTime(p['date'], p['time']);
+                          
                           return ListTile(
                             dense: true,
                             onTap: () => provider.selectConsultationPatient(p),
-                            title: Text(p['patient_name'] ?? '', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                            subtitle: Text(p['service_detail'] ?? '', style: const TextStyle(fontSize: 10, color: Colors.grey)),
-                            trailing: Text(p['patient_mr_number']?.toString() ?? '', style: const TextStyle(fontSize: 10, color: kTeal, fontWeight: FontWeight.bold)),
+                            title: Row(
+                              children: [
+                                Expanded(child: Text(p['patient_name'] ?? '', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
+                                if (p['token_number'] != null) ...[
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.indigo.shade50,
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(color: Colors.indigo.shade100),
+                                    ),
+                                    child: Text(
+                                      'T-${p['token_number']}',
+                                      style: TextStyle(
+                                        fontSize: 8,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.indigo.shade700,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                ],
+                              ],
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(p['service_detail'] ?? '', style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                                if (waitTime != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 2),
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.access_time, size: 10, color: Colors.amber.shade700),
+                                        const SizedBox(width: 4),
+                                        Text(waitTime, style: TextStyle(fontSize: 9, color: Colors.amber.shade800, fontWeight: FontWeight.w500)),
+                                      ],
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            trailing: Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(p['patient_mr_number']?.toString() ?? '', style: const TextStyle(fontSize: 10, color: kTeal, fontWeight: FontWeight.bold)),
+                                if (p['receipt_id'] != null)
+                                  Text(p['receipt_id'].toString(), style: const TextStyle(fontSize: 8, color: Colors.grey, fontFamily: 'monospace')),
+                              ],
+                            ),
                           );
                         },
                       ),

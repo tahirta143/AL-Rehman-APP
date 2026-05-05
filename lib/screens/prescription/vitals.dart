@@ -32,7 +32,9 @@ class _VitalsScreenState extends State<VitalsScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<VitalsProvider>().fetchConsultationPatients();
+      final provider = context.read<VitalsProvider>();
+      provider.clearForm();
+      provider.fetchConsultationPatients();
     });
   }
 

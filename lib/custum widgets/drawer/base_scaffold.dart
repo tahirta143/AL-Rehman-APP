@@ -147,14 +147,7 @@ class _BaseScaffoldState extends State<BaseScaffold> {
         if (drawerIndex == widget.drawerIndex) return;
 
         if (widget.onBottomNavTap != null) {
-          // For MainShell, map drawer index back to bottom index
-          int btmIdx = 0;
-          if (drawerIndex == 0) btmIdx = 0;
-          else if (drawerIndex == 5) btmIdx = 1;
-          else if (drawerIndex == 1) btmIdx = 2;
-          else if (drawerIndex == 8) btmIdx = 3;
-          else if (drawerIndex == 2) btmIdx = 4;
-          widget.onBottomNavTap!(btmIdx);
+          widget.onBottomNavTap!(drawerIndex);
           return;
         }
 

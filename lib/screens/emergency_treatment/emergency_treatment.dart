@@ -556,7 +556,7 @@ class _EmergencyTreatmentScreenState extends State<EmergencyTreatmentScreen>
         children: [
           // ☰ MENU BUTTON
           GestureDetector(
-            onTap: () => Scaffold.of(context).openDrawer(),
+             onTap: () => _scaffoldKey.currentState?.openDrawer(),
             child: Container(
               padding: EdgeInsets.all(_sw * 0.022),
               decoration: BoxDecoration(

@@ -113,36 +113,54 @@ class VitalsProvider extends ChangeNotifier {
         debugPrint('📴 Patient not found online or offline mode. Searching local DB for $mr...');
         final db = await _db.database;
         
-        // 1. Check patients_local
+        // 1. Try exact, padded, and device_uuid
+        final searchInput = _normalizeMrNumber(mr);
         final localRows = await db.query(
           'patients_local', 
-          where: 'mr_number = ? OR device_uuid = ?', 
-          whereArgs: [mr, mr]
+          where: 'mr_number = ? OR mr_number = ? OR device_uuid = ?', 
+          whereArgs: [mr, searchInput, mr]
         );
         
         if (localRows.isNotEmpty) {
           _currentPatient = PatientModel.fromLocalMap(localRows.first);
           debugPrint('✅ Found patient in patients_local: ${_currentPatient?.fullName}');
         } else {
-          // 2. Check cached_consultations (from today's online sync)
-          final cachedRows = await db.query(
-            'cached_consultations',
-            where: 'patient_mr_number = ?',
-            whereArgs: [mr]
-          );
-          if (cachedRows.isNotEmpty) {
-            final c = cachedRows.first;
-            _currentPatient = PatientModel(
-              mrNumber: c['patient_mr_number']?.toString() ?? '',
-              firstName: c['patient_name']?.toString() ?? 'Patient',
-              lastName: '',
-              gender: 'Male', // Default if unknown
-              registeredAt: DateTime.now(),
+          // 2. Try numeric match for local patients
+          final numericInput = mr.replaceAll(RegExp(r'[^0-9]'), '');
+          if (numericInput.isNotEmpty) {
+             final allLocal = await db.query('patients_local');
+             final match = allLocal.firstWhere((p) {
+                final dbMr = (p['mr_number'] ?? '').toString();
+                final dbNumeric = dbMr.replaceAll(RegExp(r'[^0-9]'), '');
+                return dbNumeric.isNotEmpty && (dbNumeric == numericInput || int.tryParse(dbNumeric) == int.tryParse(numericInput));
+             }, orElse: () => {});
+             if (match.isNotEmpty) {
+               _currentPatient = PatientModel.fromLocalMap(match);
+               debugPrint('✅ Found patient locally via numeric match: ${_currentPatient?.fullName}');
+             }
+          }
+          
+          if (_currentPatient == null) {
+            // 3. Check cached_consultations
+            final cachedRows = await db.query(
+              'cached_consultations',
+              where: 'patient_mr_number = ?',
+              whereArgs: [mr]
             );
-            _receiptId ??= c['receipt_id']?.toString();
-            _doctorName ??= c['doctor_name']?.toString();
-            _tokenNumber ??= c['token_number']?.toString();
-            debugPrint('✅ Found patient in cached_consultations');
+            if (cachedRows.isNotEmpty) {
+              final c = cachedRows.first;
+              _currentPatient = PatientModel(
+                mrNumber: c['patient_mr_number']?.toString() ?? '',
+                firstName: c['patient_name']?.toString() ?? 'Patient',
+                lastName: '',
+                gender: 'Male',
+                registeredAt: DateTime.now(),
+              );
+              _receiptId ??= c['receipt_id']?.toString();
+              _doctorName ??= c['doctor_name']?.toString();
+              _tokenNumber ??= c['token_number']?.toString();
+              debugPrint('✅ Found patient in cached_consultations');
+            }
           }
         }
       }
@@ -206,7 +224,19 @@ class VitalsProvider extends ChangeNotifier {
       ctrl.clear();
     }
     _painScale = 0;
+    _bmi = '—';
+    _bmr = '—';
+    _whr = '—';
     notifyListeners();
+  }
+
+  void clearForm() {
+    _currentPatient = null;
+    _receiptId = null;
+    _tokenNumber = null;
+    _doctorName = null;
+    _errorMessage = null;
+    _clearInputs();
   }
 
   // ─── Calculations ───────────────────────────────────────────────────
@@ -408,5 +438,14 @@ class VitalsProvider extends ChangeNotifier {
       _isSaving = false;
       notifyListeners();
     }
+  }
+
+  String _normalizeMrNumber(String input) {
+    String trimmed = input.trim();
+    if (trimmed.isEmpty) return "";
+    if (RegExp(r'^\d+$').hasMatch(trimmed)) {
+      return trimmed.padLeft(5, '0');
+    }
+    return trimmed;
   }
 }

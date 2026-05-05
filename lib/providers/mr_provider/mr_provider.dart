@@ -235,7 +235,22 @@ class MrProvider extends ChangeNotifier {
     try {
       final localRows = await _db.queryAll('patients_local');
       final match = localRows.firstWhere(
-        (p) => p['mr_number'] == searchInput,
+        (p) {
+          final mr = p['mr_number']?.toString() ?? '';
+          // Exact match (padded or prefixed)
+          if (mr == searchInput) return true;
+          if (mr == trimmed) return true;
+          
+          // Match numeric part (e.g. input "1" matches "CAMP-1" or "00001")
+          final numericInput = trimmed.replaceAll(RegExp(r'[^0-9]'), '');
+          if (numericInput.isNotEmpty) {
+            final dbNumeric = mr.replaceAll(RegExp(r'[^0-9]'), '');
+            if (dbNumeric.isNotEmpty && (dbNumeric == numericInput || int.tryParse(dbNumeric) == int.tryParse(numericInput))) {
+              return true;
+            }
+          }
+          return false;
+        },
         orElse: () => {},
       );
       if (match.isNotEmpty) {
@@ -275,7 +290,14 @@ class MrProvider extends ChangeNotifier {
   }
 
   String _normalizeMrNumber(String input) {
-    return input.trim();
+    String trimmed = input.trim();
+    if (trimmed.isEmpty) return "";
+    
+    // If it's a numeric string, pad it to 5 digits (hospital standard)
+    if (RegExp(r'^\d+$').hasMatch(trimmed)) {
+      return trimmed.padLeft(5, '0');
+    }
+    return trimmed;
   }
 
   // ── State mutations ──

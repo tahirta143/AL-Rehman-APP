@@ -98,7 +98,7 @@ class _AppointmentDialogState extends State<AppointmentDialog> {
     }
 
     final mrProv = Provider.of<MrProvider>(context, listen: false);
-    final patient = await mrProv.findByMrNumber(raw);
+    final patient = await mrProv.findByMrNumber(raw, normalize: true);
 
     if (!mounted) return;
 

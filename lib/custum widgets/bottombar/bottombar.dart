@@ -44,12 +44,13 @@ class _CustomFluidBottomNavBarState extends State<CustomFluidBottomNavBar>
   @override
   void initState() {
     super.initState();
-    _prevIndex = widget.currentIndex;
-    _visibleItems = _allItems; // will be updated in build
-    _initAnimations(_allItems.length);
+    _visibleItems = _allItems;
+    final initialVisualIndex = _visibleItems.indexWhere((item) => item.drawerIndex == widget.currentIndex);
+    _prevIndex = initialVisualIndex < 0 ? 0 : initialVisualIndex;
+    _initAnimations(_visibleItems.length, initialVisualIndex);
   }
 
-  void _initAnimations(int count) {
+  void _initAnimations(int count, int visualIndex) {
     _controllers = List.generate(count, (i) =>
         AnimationController(vsync: this, duration: const Duration(milliseconds: 320)));
     _scaleAnims = _controllers.map((c) =>
@@ -61,22 +62,28 @@ class _CustomFluidBottomNavBarState extends State<CustomFluidBottomNavBar>
     _slideAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
         CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic));
 
-    if (widget.currentIndex < _controllers.length) {
-      _controllers[widget.currentIndex].forward();
+    if (visualIndex >= 0 && visualIndex < _controllers.length) {
+      _controllers[visualIndex].forward();
     }
     _slideController.value = 1.0;
   }
 
   @override
-  @override
   void didUpdateWidget(CustomFluidBottomNavBar old) {
     super.didUpdateWidget(old);
 
     if (old.currentIndex != widget.currentIndex) {
-      if (old.currentIndex < _controllers.length) _controllers[old.currentIndex].reverse();
-      if (widget.currentIndex < _controllers.length) _controllers[widget.currentIndex].forward();
+      final oldVisualIndex = _visibleItems.indexWhere((item) => item.drawerIndex == old.currentIndex);
+      final newVisualIndex = _visibleItems.indexWhere((item) => item.drawerIndex == widget.currentIndex);
 
-      _prevIndex = old.currentIndex;
+      if (oldVisualIndex >= 0 && oldVisualIndex < _controllers.length) {
+        _controllers[oldVisualIndex].reverse();
+      }
+      if (newVisualIndex >= 0 && newVisualIndex < _controllers.length) {
+        _controllers[newVisualIndex].forward();
+      }
+
+      _prevIndex = oldVisualIndex < 0 ? 0 : oldVisualIndex;
 
       // Reset properly before animating
       _slideController.stop();
@@ -115,7 +122,8 @@ class _CustomFluidBottomNavBarState extends State<CustomFluidBottomNavBar>
       for (final c in _controllers) c.dispose();
       _slideController.dispose();
       _visibleItems = visible;
-      _initAnimations(visible.length);
+      final currentVisualIndex = _visibleItems.indexWhere((item) => item.drawerIndex == widget.currentIndex);
+      _initAnimations(visible.length, currentVisualIndex);
     } else {
       _visibleItems = visible;
     }

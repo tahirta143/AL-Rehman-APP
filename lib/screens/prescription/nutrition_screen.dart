@@ -9,6 +9,7 @@ import '../../models/mr_model/mr_patient_model.dart';
 import '../../models/vitals_model/vitals_model.dart';
 import '../../core/services/pdf_nutrition_service.dart';
 import '../../custum widgets/custom_loader.dart';
+import '../../core/utils/wait_time_helper.dart';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const kTeal = Color(0xFF00B5AD);
@@ -63,90 +64,101 @@ class _NutritionScreenState extends State<NutritionScreen> {
           top: mq.size.height * 0.02,
           bottom: mq.size.height * 0.15,
         ),
-        child: Column(
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (isMobile) _ConsultationDropdown(provider: prescriptionProvider),
-            if (isMobile) const SizedBox(height: 16),
-            
-            // ── Patient Info ──────────────────────────────────────────────────
-            FadeInUp(
-              duration: const Duration(milliseconds: 400),
-              child: _PatientInfoCard(
-                isTablet: !isMobile,
-                screenW: mq.size.width,
-                provider: prescriptionProvider,
-                nutritionProvider: nutritionProvider,
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // ── Nutritional Assessment & Plan ──────────────────────────────────
-            FadeInUp(
-              delay: const Duration(milliseconds: 100),
-              child: _buildSectionCard(
-                title: 'Nutritional Assessment & Plan',
-                icon: Icons.scale_outlined,
-                child: Column(
-                  children: [
-                    _buildSubHeader('MACRONUTRIENT GOALS', Icons.local_fire_department_outlined),
-                    const SizedBox(height: 8),
-                    _buildMacroGrid(mq.size.width, nutritionProvider),
-                    const SizedBox(height: 16),
-                    
-                    _buildSubHeader('DIET SPECIFICATIONS', Icons.opacity_outlined),
-                    const SizedBox(height: 8),
-                    _buildSpecsGrid(mq.size.width, nutritionProvider),
-                    const SizedBox(height: 16),
-
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(child: _InputField(label: 'Dietary Recommendations', hint: 'Enter recommendations...', maxLines: 2, controller: nutritionProvider.controllers['dietaryRec'])),
-                        const SizedBox(width: 12),
-                        Expanded(child: _InputField(label: 'Lifestyle Recommendations', hint: 'Enter suggestions...', maxLines: 2, controller: nutritionProvider.controllers['lifestyleRec'])),
-                      ],
+            Expanded(
+              flex: 9,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (isMobile) _ConsultationDropdown(provider: prescriptionProvider),
+                  if (isMobile) const SizedBox(height: 16),
+                  
+                  // ── Patient Info ──────────────────────────────────────────────────
+                  FadeInUp(
+                    duration: const Duration(milliseconds: 400),
+                    child: _PatientInfoCard(
+                      isTablet: !isMobile,
+                      screenW: mq.size.width,
+                      provider: prescriptionProvider,
+                      nutritionProvider: nutritionProvider,
                     ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
+                  ),
+                  const SizedBox(height: 20),
 
-            // ── Diet Plan Schedule ─────────────────────────────────────────────
-            FadeInUp(
-              delay: const Duration(milliseconds: 200),
-              child: _buildSectionCard(
-                title: 'Diet Plan Schedule',
-                icon: Icons.calendar_today_outlined,
-                child: _buildScheduleList(mq.size.width, nutritionProvider),
-              ),
-            ),
-            const SizedBox(height: 24),
+                  // ── Nutritional Assessment & Plan ──────────────────────────────────
+                  FadeInUp(
+                    delay: const Duration(milliseconds: 100),
+                    child: _buildSectionCard(
+                      title: 'Nutritional Assessment & Plan',
+                      icon: Icons.scale_outlined,
+                      child: Column(
+                        children: [
+                          _buildSubHeader('MACRONUTRIENT GOALS', Icons.local_fire_department_outlined),
+                          const SizedBox(height: 8),
+                          _buildMacroGrid(mq.size.width, nutritionProvider),
+                          const SizedBox(height: 16),
+                          
+                          _buildSubHeader('DIET SPECIFICATIONS', Icons.opacity_outlined),
+                          const SizedBox(height: 8),
+                          _buildSpecsGrid(mq.size.width, nutritionProvider),
+                          const SizedBox(height: 16),
 
-            // ── Save & Print Button ───────────────────────────────────────────
-            FadeInUp(
-              delay: const Duration(milliseconds: 300),
-              child: _SavePrintButton(
-                isTablet: !isMobile,
-                onPressed: () async {
-                  final savedId = await nutritionProvider.savePrescription(prescriptionProvider);
-                  if (savedId != null) {
-                    if (!mounted) return;
-                    _showSuccessDialog(context, nutritionProvider, savedId);
-                  } else {
-                    if (!mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Failed to save prescription. Ensure a patient is selected.'), backgroundColor: Colors.red),
-                    );
-                  }
-                },
-                isLoading: nutritionProvider.isSaving,
-                isEnabled: prescriptionProvider.currentPatient != null,
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(child: _InputField(label: 'Dietary Recommendations', hint: 'Enter recommendations...', maxLines: 2, controller: nutritionProvider.controllers['dietaryRec'])),
+                              const SizedBox(width: 12),
+                              Expanded(child: _InputField(label: 'Lifestyle Recommendations', hint: 'Enter suggestions...', maxLines: 2, controller: nutritionProvider.controllers['lifestyleRec'])),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // ── Diet Plan Schedule ─────────────────────────────────────────────
+                  FadeInUp(
+                    delay: const Duration(milliseconds: 200),
+                    child: _buildSectionCard(
+                      title: 'Diet Plan Schedule',
+                      icon: Icons.calendar_today_outlined,
+                      child: _buildScheduleList(mq.size.width, nutritionProvider),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // ── Save & Print Button ───────────────────────────────────────────
+                  FadeInUp(
+                    delay: const Duration(milliseconds: 300),
+                    child: _SavePrintButton(
+                      isTablet: !isMobile,
+                      onPressed: () async {
+                        final savedId = await nutritionProvider.savePrescription(prescriptionProvider);
+                        if (savedId != null) {
+                          if (!mounted) return;
+                          _showSuccessDialog(context, nutritionProvider, savedId);
+                        } else {
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Failed to save prescription. Ensure a patient is selected.'), backgroundColor: Colors.red),
+                          );
+                        }
+                      },
+                      isLoading: nutritionProvider.isSaving,
+                      isEnabled: prescriptionProvider.currentPatient != null,
+                    ),
+                  ),
+                ],
               ),
             ),
-            
-            const SizedBox(height: 32),
+            if (!isMobile)
+              const Expanded(
+                flex: 3,
+                child: _ConsultationSidebar(),
+              ),
           ],
         ),
       ),
@@ -445,19 +457,157 @@ class _ConsultationDropdown extends StatelessWidget {
           value: null,
           onChanged: (val) => provider.selectConsultationPatient(val),
           items: provider.consultationPatients.map((p) {
+            final waitTime = WaitTimeHelper.getWaitTime(p['date'], p['time']);
             return DropdownMenuItem(
               value: p,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(p['patient_name'] ?? '', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  Row(
+                    children: [
+                      Text(p['patient_name'] ?? '', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      if (p['token_number'] != null) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: kTeal,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '#${p['token_number']}',
+                            style: const TextStyle(fontSize: 8, fontWeight: FontWeight.w900, color: Colors.white),
+                          ),
+                        ),
+                      ],
+                      if (waitTime != null) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.shade50,
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: Colors.amber.shade200),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.access_time, size: 8, color: Colors.amber.shade800),
+                              const SizedBox(width: 4),
+                              Text(waitTime, style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.amber.shade800)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                   Text('MR: ${p['patient_mr_number']} | ${p['receipt_id']}', style: const TextStyle(fontSize: 10, color: kTextMid)),
                 ],
               ),
             );
           }).toList(),
         ),
+      ),
+    );
+  }
+}
+
+class _ConsultationSidebar extends StatelessWidget {
+  const _ConsultationSidebar();
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = context.watch<PrescriptionProvider>();
+    return Container(
+      margin: const EdgeInsets.only(left: 16),
+      decoration: BoxDecoration(
+        color: kWhite,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: kBorder),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4)],
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(colors: [Color(0xFF00B5AD), Color(0xFF00968F)]),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.assignment_ind, color: Colors.white, size: 16),
+                const SizedBox(width: 8),
+                const Text('Consultations', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.refresh, color: Colors.white, size: 16),
+                  onPressed: () => provider.loadConsultationPatients(),
+                  constraints: const BoxConstraints(),
+                  padding: EdgeInsets.zero,
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: provider.isLoadingPatients
+                ? const CustomLoader(size: 30)
+                : provider.consultationPatients.isEmpty
+                    ? const Center(child: Text('No consultations today', style: TextStyle(fontSize: 11, color: Colors.grey)))
+                    : ListView.separated(
+                        itemCount: provider.consultationPatients.length,
+                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        itemBuilder: (context, idx) {
+                          final p = provider.consultationPatients[idx];
+                          final waitTime = WaitTimeHelper.getWaitTime(p['date'], p['time']);
+                          
+                          return ListTile(
+                            dense: true,
+                            onTap: () => provider.selectConsultationPatient(p),
+                            title: Row(
+                              children: [
+                                Expanded(child: Text(p['patient_name'] ?? '', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
+                                if (p['token_number'] != null) ...[
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.indigo.shade50,
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(color: Colors.indigo.shade100),
+                                    ),
+                                    child: Text(
+                                      'T-${p['token_number']}',
+                                      style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.indigo.shade700),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                ],
+                              ],
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(p['service_detail'] ?? '', style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                                if (waitTime != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 2),
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.access_time, size: 10, color: Colors.amber.shade700),
+                                        const SizedBox(width: 4),
+                                        Text(waitTime, style: TextStyle(fontSize: 9, color: Colors.amber.shade800, fontWeight: FontWeight.w500)),
+                                      ],
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            trailing: Text(p['patient_mr_number']?.toString() ?? '', style: const TextStyle(fontSize: 10, color: kTeal, fontWeight: FontWeight.bold)),
+                          );
+                        },
+                      ),
+          ),
+        ],
       ),
     );
   }

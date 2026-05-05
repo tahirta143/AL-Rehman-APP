@@ -194,7 +194,9 @@ class PrescriptionProvider extends ChangeNotifier {
     try {
       // 1. Load local pending visits
       final localVisits = await _db.queryAll('visits_local');
-      final List<dynamic> merged = localVisits
+      final List<dynamic> merged = [];
+      
+      merged.addAll(localVisits
           .where((v) => v['sync_status'] == 'pending')
           .map((v) => {
                 'patient_mr_number': v['patient_uuid'],
@@ -203,15 +205,15 @@ class PrescriptionProvider extends ChangeNotifier {
                 'service_detail': v['opd_service'],
                 'date': v['date'],
                 'status': 'Pending Sync',
-              })
-          .toList();
+              }));
 
       // 2. Load Online
       if (_connectivity.isOnline.value) {
         try {
           final res = await _apiService.fetchConsultationPatients().timeout(const Duration(seconds: 10));
           if (res['success'] == true) {
-            merged.addAll(res['data'] as List? ?? []);
+            final onlineData = res['data'] as List? ?? [];
+            merged.addAll(onlineData);
           }
         } catch (e) {
           debugPrint('⚠️ Online consultation patients load failed: $e');
@@ -310,6 +312,9 @@ class PrescriptionProvider extends ChangeNotifier {
     _isLoading = true;
     _errorMessage = null;
     _currentPatient = null;
+    _currentVitals = null;
+    for (var c in vitalControllers.values) c.clear();
+    for (var c in noteControllers.values) c.clear();
     notifyListeners();
 
     final mr = mrNumber.trim();
@@ -330,15 +335,33 @@ class PrescriptionProvider extends ChangeNotifier {
       // 📴 Search locally
       debugPrint('📴 Prescription search: searching local DB for $mr');
       final db = await _db.database;
+      
+      // Try exact, padded, and device_uuid
+      final searchInput = _normalizeMrNumber(mr);
       final localRows = await db.query(
         'patients_local',
-        where: 'mr_number = ? OR device_uuid = ?',
-        whereArgs: [mr, mr]
+        where: 'mr_number = ? OR mr_number = ? OR device_uuid = ?',
+        whereArgs: [mr, searchInput, mr]
       );
 
       if (localRows.isNotEmpty) {
         _currentPatient = PatientModel.fromLocalMap(localRows.first);
         debugPrint('✅ Found patient locally: ${_currentPatient?.fullName}');
+      } else {
+        // Try numeric match as last resort
+        final numericInput = mr.replaceAll(RegExp(r'[^0-9]'), '');
+        if (numericInput.isNotEmpty) {
+           final allLocal = await db.query('patients_local');
+           final match = allLocal.firstWhere((p) {
+              final dbMr = (p['mr_number'] ?? '').toString();
+              final dbNumeric = dbMr.replaceAll(RegExp(r'[^0-9]'), '');
+              return dbNumeric.isNotEmpty && (dbNumeric == numericInput || int.tryParse(dbNumeric) == int.tryParse(numericInput));
+           }, orElse: () => {});
+           if (match.isNotEmpty) {
+             _currentPatient = PatientModel.fromLocalMap(match);
+             debugPrint('✅ Found patient locally via numeric match: ${_currentPatient?.fullName}');
+           }
+        }
       }
     }
 
@@ -656,6 +679,7 @@ class PrescriptionProvider extends ChangeNotifier {
     _instructions = [];
     _diagnosisAnswers = {};
     _currentPatient = null;
+    _currentVitals = null;
     _receiptId = null;
     _tokenNumber = null;
     _doctorName = null;
@@ -677,9 +701,15 @@ class PrescriptionProvider extends ChangeNotifier {
     }
     for (var side in visionCtrls.values) {
       for (var ctrl in side.values) ctrl.clear();
-    }
-    eyeHistory.updateAll((key, value) => false);
-    
     notifyListeners();
+  }}
+
+  String _normalizeMrNumber(String input) {
+    String trimmed = input.trim();
+    if (trimmed.isEmpty) return "";
+    if (RegExp(r'^\d+$').hasMatch(trimmed)) {
+      return trimmed.padLeft(5, '0');
+    }
+    return trimmed;
   }
 }

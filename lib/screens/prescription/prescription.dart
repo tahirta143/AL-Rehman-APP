@@ -11,6 +11,7 @@ import '../../custum widgets/custom_loader.dart';
 import '../../custum widgets/animations/animations.dart';
 import 'package:animate_do/animate_do.dart';
 import 'widgets/lab_values_sheet.dart';
+import '../../core/utils/wait_time_helper.dart';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const kTeal = Color(0xFF00B5AD);
@@ -122,6 +123,7 @@ class _ConsultationDropdown extends StatelessWidget {
           value: null,
           onChanged: (val) => provider.selectConsultationPatient(val),
           items: provider.consultationPatients.map((p) {
+            final waitTime = WaitTimeHelper.getWaitTime(p['date'], p['time']);
             return DropdownMenuItem(
               value: p,
               child: Column(
@@ -150,6 +152,25 @@ class _ConsultationDropdown extends StatelessWidget {
                               color: Colors.white,
                               letterSpacing: 0.5,
                             ),
+                          ),
+                        ),
+                      ],
+                      if (waitTime != null) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.shade50,
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: Colors.amber.shade200),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.access_time, size: 8, color: Colors.amber.shade800),
+                              const SizedBox(width: 4),
+                              Text(waitTime, style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.amber.shade800)),
+                            ],
                           ),
                         ),
                       ],
@@ -223,6 +244,8 @@ class _ConsultationSidebarState extends State<_ConsultationSidebar> {
                         separatorBuilder: (_, __) => const Divider(height: 1),
                         itemBuilder: (context, idx) {
                           final p = provider.consultationPatients[idx];
+                          final waitTime = WaitTimeHelper.getWaitTime(p['date'], p['time']);
+                          
                           return ListTile(
                             dense: true,
                             onTap: () => provider.selectConsultationPatient(p),
@@ -270,7 +293,23 @@ class _ConsultationSidebarState extends State<_ConsultationSidebar> {
                                  ],
                                ],
                              ),
-                            subtitle: Text(p['service_detail'] ?? '', style: const TextStyle(fontSize: 10, color: kTextMid)),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(p['service_detail'] ?? '', style: const TextStyle(fontSize: 10, color: kTextMid)),
+                                if (waitTime != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 2),
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.access_time, size: 10, color: Colors.amber.shade700),
+                                        const SizedBox(width: 4),
+                                        Text(waitTime, style: TextStyle(fontSize: 9, color: Colors.amber.shade800, fontWeight: FontWeight.w500)),
+                                      ],
+                                    ),
+                                  ),
+                              ],
+                            ),
                             trailing: Text(p['patient_mr_number']?.toString() ?? '', style: const TextStyle(fontSize: 10, color: Color(0xFF2563EB), fontWeight: FontWeight.bold)),
                           );
                         },
@@ -814,8 +853,8 @@ class _InputFieldState extends State<_InputField> {
   @override
   void didUpdateWidget(_InputField oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.initialValue != oldWidget.initialValue && widget.initialValue != null) {
-      _ctrl.text = widget.initialValue!;
+    if (widget.initialValue != oldWidget.initialValue) {
+      _ctrl.text = widget.initialValue ?? '';
     }
   }
 
