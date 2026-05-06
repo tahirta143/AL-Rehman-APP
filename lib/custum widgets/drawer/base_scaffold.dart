@@ -5,25 +5,22 @@ import 'package:hims_app/screens/cunsultations/cunsultations.dart';
 import 'package:hims_app/screens/discount_vouchers/discount_vouchers.dart';
 import 'package:hims_app/screens/emergency_treatment/emergency_treatment.dart';
 import 'package:hims_app/screens/mr_details/mr_details.dart';
-import 'package:hims_app/screens/mr_details/mr_view/mr_view.dart';
 import 'package:hims_app/screens/opd_reciepts/opd_reciept.dart';
 import 'package:hims_app/screens/opd_reciepts/opd_records.dart';
-import 'package:hims_app/screens/consultation_payments/consultation_payments.dart'
-    hide TextStyle;
+import 'package:hims_app/screens/consultation_payments/consultation_payments.dart';
 import 'package:hims_app/screens/shift_management/shift_management.dart';
 import '../../screens/add_expenses/add_expenses.dart';
-import '../../screens/dashboard/dashboard.dart';
+import '../../screens/dashboard/dashboard.dart' as dash;
 import '../../screens/dashboard/offline_dashboard.dart';
+import '../../screens/home/home_screen.dart' as landing;
 import '../../custum widgets/bottombar/bottombar.dart';
 import '../../core/providers/permission_provider.dart';
-import '../../core/utils/date_formatter.dart';
 import '../../screens/prescription/fundus_examination_screen.dart';
 import '../../screens/prescription/nutrition_screen.dart';
 import '../../screens/prescription/prescription.dart';
 import '../../screens/prescription/lab_values.dart';
 import '../../screens/prescription/eye_prescription.dart';
 import '../../screens/prescription/vitals.dart';
-import '../../screens/prescription/lab_values.dart';
 import '../../screens/pharmacy_screens/add_modify_medicines_screen.dart';
 import '../../screens/pharmacy_screens/opening_balances_screen.dart';
 import '../../screens/pharmacy_screens/purchase_posting_screen.dart';
@@ -247,7 +244,7 @@ class _BaseScaffoldState extends State<BaseScaffold> {
 
     switch (index) {
       case 0:
-        screen = const HomeScreen();
+        screen = const dash.DashboardScreen();
         break;
       case 1:
         screen = const ConsultationScreen();
@@ -308,6 +305,9 @@ class _BaseScaffoldState extends State<BaseScaffold> {
         break;
       case 20:
         screen = const SalesInvoiceScreen();
+        break;
+      case 21:
+        screen = const landing.HomeScreen();
         break;
       case 100:
         screen = const SyncDashboardScreen();

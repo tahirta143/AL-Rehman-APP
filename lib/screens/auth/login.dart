@@ -5,7 +5,7 @@ import 'package:hims_app/core/services/auth_storage_service.dart';
 import 'package:hims_app/screens/auth/sign_up.dart';
 import 'package:hims_app/screens/auth/mobile_login_screen.dart';
 import 'package:provider/provider.dart';
-import '../dashboard/dashboard.dart';
+import '../main_shell.dart';
 import '../../custum widgets/custom_loader.dart';
 
 
@@ -67,11 +67,11 @@ class _SignInScreenState extends State<SignInScreen> {
       final permProvider = context.read<PermissionProvider>();
       await permProvider.syncFromServer();
 
-      // Step 4: Navigate to dashboard
+      // Step 4: Navigate to Main Shell
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
+        MaterialPageRoute(builder: (_) => const MainShell()),
         (_) => false,
       );
     } finally {
@@ -92,13 +92,6 @@ class _SignInScreenState extends State<SignInScreen> {
     );
   }
 
-  void _handleSignUpNavigation() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const SignUpScreen()),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final mq        = MediaQuery.of(context);
@@ -107,7 +100,6 @@ class _SignInScreenState extends State<SignInScreen> {
     final hPad      = screenW * 0.07;
     final headerH   = screenH * 0.30;
     final logoSize  = screenW * 0.18;
-    final logoIconSize   = screenW * 0.10;
     final titleFontSize  = screenW * 0.062;
     final inputFontSize  = screenW * 0.038;
     final btnFontSize    = screenW * 0.042;

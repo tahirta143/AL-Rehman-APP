@@ -204,7 +204,13 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
           bottom: sh * 0.022),
       child: Row(children: [
         GestureDetector(
-           onTap: () => _scaffoldKey.currentState?.openDrawer(),
+           onTap: () {
+             if (widget.useScaffold) {
+               _scaffoldKey.currentState?.openDrawer();
+             } else {
+               Scaffold.of(context).openDrawer();
+             }
+           },
           child: Container(
             padding: EdgeInsets.all(sw * 0.022),
             decoration: BoxDecoration(

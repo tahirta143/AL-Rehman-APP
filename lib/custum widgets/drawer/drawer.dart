@@ -134,13 +134,20 @@ class _CustomDrawerState extends State<CustomDrawer> {
           index: 9,
         ),
       if (perm.canAny([
-        Perm.prescriptionRead, Perm.prescriptionCreate,
-        Perm.eyeRecordRead, Perm.eyeRecordUpdate,
-        Perm.eyeDiagnosisRead, Perm.eyeDiagnosisUpdate,
-        Perm.eyeOptometristRead, Perm.eyeOptometristUpdate,
-        Perm.eyeExaminationRead, Perm.eyeExaminationUpdate,
-        Perm.eyeManagementRead, Perm.eyeManagementUpdate,
-        Perm.eyeMedicinesRead, Perm.eyeMedicinesUpdate,
+        Perm.prescriptionRead,
+        Perm.prescriptionCreate,
+        Perm.eyeRecordRead,
+        Perm.eyeRecordUpdate,
+        Perm.eyeDiagnosisRead,
+        Perm.eyeDiagnosisUpdate,
+        Perm.eyeOptometristRead,
+        Perm.eyeOptometristUpdate,
+        Perm.eyeExaminationRead,
+        Perm.eyeExaminationUpdate,
+        Perm.eyeManagementRead,
+        Perm.eyeManagementUpdate,
+        Perm.eyeMedicinesRead,
+        Perm.eyeMedicinesUpdate,
         Perm.eyeHistoryRead,
       ]))
         const _DrawerItemData(
@@ -276,6 +283,11 @@ class _CustomDrawerState extends State<CustomDrawer> {
               child: ListView(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 children: [
+                  _buildDrawerItem(
+                    icon: Icons.home_rounded,
+                    title: 'Home',
+                    index: 21,
+                  ),
                   // Dashboard — always visible
                   _buildDrawerItem(
                     icon: Icons.dashboard_rounded,
@@ -313,7 +325,9 @@ class _CustomDrawerState extends State<CustomDrawer> {
                       hasActiveChild: _prescriptionIndices.contains(
                         widget.selectedIndex,
                       ),
-                      onTap: () => setState(() => _prescriptionExpanded = !_prescriptionExpanded),
+                      onTap: () => setState(
+                        () => _prescriptionExpanded = !_prescriptionExpanded,
+                      ),
                     ),
                   if (_prescriptionExpanded)
                     ...prescriptionItems.map(
@@ -353,7 +367,9 @@ class _CustomDrawerState extends State<CustomDrawer> {
                       hasActiveChild: _pharmacyIndices.contains(
                         widget.selectedIndex,
                       ),
-                      onTap: () => setState(() => _pharmacyExpanded = !_pharmacyExpanded),
+                      onTap: () => setState(
+                        () => _pharmacyExpanded = !_pharmacyExpanded,
+                      ),
                     ),
                   if (_pharmacyExpanded)
                     ...pharmacyItems.map(

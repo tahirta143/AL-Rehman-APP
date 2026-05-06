@@ -190,11 +190,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/mobile_auth_provider.dart';
 import '../../custum widgets/custom_loader.dart';
-import '../dashboard/dashboard.dart';
+import '../doctor/mobile_doctor_dashboard.dart';
+import '../main_shell.dart';
 
 import '../patient/patient_dashboard.dart';
-import '../doctor/mobile_doctor_dashboard.dart';
-import 'mobile_sign_up_screen.dart';
 
 class MobileLoginScreen extends StatefulWidget {
   const MobileLoginScreen({super.key});
@@ -206,7 +205,6 @@ class MobileLoginScreen extends StatefulWidget {
 class _MobileLoginScreenState extends State<MobileLoginScreen> {
   final _phoneController = TextEditingController();
   final _passwordOrOtpController = TextEditingController();
-  bool _obscurePassword = true;
 
   @override
   void dispose() {
@@ -260,7 +258,7 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
       MaterialPageRoute(builder: (_) {
         if (user?.role == 'patient') return const PatientDashboard();
         if (user?.role == 'doctor') return const MobileDoctorDashboard();
-        return const HomeScreen();
+        return const MainShell();
       }),
       (_) => false,
     );

@@ -32,11 +32,11 @@ class _CustomFluidBottomNavBarState extends State<CustomFluidBottomNavBar>
 
   // All possible nav items with their permission requirements
   static const List<_NavItemDef> _allItems = [
-    _NavItemDef(icon: Icons.dashboard_rounded,     label: 'Dashboard',  drawerIndex: 0,  permissions: []),
+    _NavItemDef(icon: Icons.home_rounded,          label: 'Home',       drawerIndex: 21, permissions: []),
+    _NavItemDef(icon: Icons.dashboard_rounded,     label: 'Dashboard',  drawerIndex: 0,  permissions: [Perm.appDashboardRead]),
     _NavItemDef(icon: Icons.warning_amber_rounded, label: 'Emergency',  drawerIndex: 5,  permissions: [Perm.emergencyRead, Perm.emergencyCreate]),
     _NavItemDef(icon: Icons.chat_bubble_rounded,   label: 'Consult',    drawerIndex: 1,  permissions: [Perm.apptRead, Perm.opdPatientRead]),
     _NavItemDef(icon: Icons.people_alt_rounded,    label: 'MR Details', drawerIndex: 8,  permissions: [Perm.mrRead, Perm.mrCreate]),
-    _NavItemDef(icon: Icons.receipt_long_rounded,  label: 'Expenses',   drawerIndex: 2,  permissions: [Perm.expenseRead, Perm.expenseCreate]),
   ];
 
   List<_NavItemDef> _visibleItems = [];
