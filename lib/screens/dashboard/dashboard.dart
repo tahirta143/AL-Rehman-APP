@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:fl_chart/fl_chart.dart';
 
 import 'package:hims_app/custum widgets/drawer/base_scaffold.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
@@ -143,7 +144,6 @@ class _SummaryCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // ── Title + icon row ───────────────────────────────────────────────
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -170,7 +170,6 @@ class _SummaryCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          // ── Animated value ─────────────────────────────────────────────────
           _AnimatedCounter(
             targetValue: numericValue,
             isCurrency: isCurrency,
@@ -189,17 +188,12 @@ class _SummaryCard extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 6),
-          // ── Trend ──────────────────────────────────────────────────────────
           Row(
             children: [
               Icon(
-                trendUp
-                    ? Icons.arrow_outward_rounded
-                    : Icons.south_east_rounded,
+                trendUp ? Icons.arrow_outward_rounded : Icons.south_east_rounded,
                 size: 11,
-                color: trendUp
-                    ? const Color(0xFF10B981)
-                    : const Color(0xFFF43F5E),
+                color: trendUp ? const Color(0xFF10B981) : const Color(0xFFF43F5E),
               ),
               const SizedBox(width: 3),
               Text(
@@ -207,9 +201,7 @@ class _SummaryCard extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.bold,
-                  color: trendUp
-                      ? const Color(0xFF10B981)
-                      : const Color(0xFFF43F5E),
+                  color: trendUp ? const Color(0xFF10B981) : const Color(0xFFF43F5E),
                 ),
               ),
             ],
@@ -245,11 +237,9 @@ class _ExpenseBar extends StatelessWidget {
         children: [
           SizedBox(
             width: 80,
-            child: Text(
-              name,
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-              overflow: TextOverflow.ellipsis,
-            ),
+            child: Text(name,
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                overflow: TextOverflow.ellipsis),
           ),
           Expanded(
             child: Stack(
@@ -257,37 +247,27 @@ class _ExpenseBar extends StatelessWidget {
                 Container(
                   height: 6,
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(3),
-                  ),
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(3)),
                 ),
                 FractionallySizedBox(
                   widthFactor: pct,
                   child: Container(
                     height: 6,
                     decoration: BoxDecoration(
-                      color: color,
-                      borderRadius: BorderRadius.circular(3),
-                    ),
+                        color: color, borderRadius: BorderRadius.circular(3)),
                   ),
                 ),
               ],
             ),
           ),
           const SizedBox(width: 12),
-          Text(
-            'PKR ${NumberFormat('#,###').format(value)}',
-            style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              fontFamily: 'monospace',
-            ),
-          ),
+          Text('PKR ${NumberFormat('#,###').format(value)}',
+              style: const TextStyle(
+                  fontSize: 11, fontWeight: FontWeight.bold, fontFamily: 'monospace')),
           const SizedBox(width: 8),
-          Text(
-            '${(pct * 100).round()}%',
-            style: TextStyle(fontSize: 10, color: Colors.grey.shade400),
-          ),
+          Text('${(pct * 100).round()}%',
+              style: TextStyle(fontSize: 10, color: Colors.grey.shade400)),
         ],
       ),
     );
@@ -322,7 +302,6 @@ class _DoctorCard extends StatelessWidget {
         clipBehavior: Clip.none,
         alignment: Alignment.topRight,
         children: [
-          // ── Main Card Container ───────────────────────────────────────────
           Container(
             width: cardWidth,
             margin: EdgeInsets.only(
@@ -334,10 +313,9 @@ class _DoctorCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(screenSize.width * 0.04),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
+                    color: Colors.grey.withOpacity(0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2)),
               ],
             ),
             child: Padding(
@@ -353,50 +331,39 @@ class _DoctorCard extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              doctor.name,
-                              style: TextStyle(
-                                fontSize: screenSize.width * 0.045,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black87,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                            Text(doctor.name,
+                                style: TextStyle(
+                                    fontSize: screenSize.width * 0.045,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black87),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis),
                             SizedBox(height: screenSize.height * 0.003),
-                            Text(
-                              doctor.specialty,
-                              style: TextStyle(
-                                fontSize: screenSize.width * 0.035,
-                                color: Colors.grey.shade600,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                            Text(doctor.specialty,
+                                style: TextStyle(
+                                    fontSize: screenSize.width * 0.035,
+                                    color: Colors.grey.shade600),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis),
                             SizedBox(height: screenSize.height * 0.008),
                             Container(
                               padding: EdgeInsets.symmetric(
-                                horizontal: screenSize.width * 0.02,
-                                vertical: screenSize.height * 0.004,
-                              ),
+                                  horizontal: screenSize.width * 0.02,
+                                  vertical: screenSize.height * 0.004),
                               decoration: BoxDecoration(
                                 color: primaryColor.withOpacity(0.1),
                                 borderRadius:
                                 BorderRadius.circular(screenSize.width * 0.02),
                               ),
-                              child: Text(
-                                'Rs. ${doctor.consultationFee}',
-                                style: TextStyle(
-                                  fontSize: screenSize.width * 0.04,
-                                  fontWeight: FontWeight.bold,
-                                  color: primaryColor,
-                                ),
-                              ),
+                              child: Text('Rs. ${doctor.consultationFee}',
+                                  style: TextStyle(
+                                      fontSize: screenSize.width * 0.04,
+                                      fontWeight: FontWeight.bold,
+                                      color: primaryColor)),
                             ),
                           ],
                         ),
                       ),
-                      // Reserve space for the absolute positioned image
                       SizedBox(width: screenSize.width * 0.28),
                     ],
                   ),
@@ -406,46 +373,35 @@ class _DoctorCard extends StatelessWidget {
                       Icon(Icons.access_time,
                           size: screenSize.width * 0.035, color: Colors.green),
                       SizedBox(width: screenSize.width * 0.01),
-                      Text(
-                        '$availableSlots Slots Available',
-                        style: TextStyle(
-                          fontSize: screenSize.width * 0.03,
-                          color: Colors.green,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
+                      Text('$availableSlots Slots Available',
+                          style: TextStyle(
+                              fontSize: screenSize.width * 0.03,
+                              color: Colors.green,
+                              fontWeight: FontWeight.w500)),
                     ],
                   ),
                   SizedBox(height: screenSize.height * 0.01),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _buildDayChip(
-                          'Mon', screenSize, doctor.availableDays.contains('Mon')),
-                      _buildDayChip(
-                          'Tue', screenSize, doctor.availableDays.contains('Tue')),
-                      _buildDayChip(
-                          'Wed', screenSize, doctor.availableDays.contains('Wed')),
-                      _buildDayChip(
-                          'Thu', screenSize, doctor.availableDays.contains('Thu')),
-                      _buildDayChip(
-                          'Fri', screenSize, doctor.availableDays.contains('Fri')),
-                      _buildDayChip(
-                          'Sat', screenSize, doctor.availableDays.contains('Sat')),
+                      _buildDayChip('Mon', screenSize, doctor.availableDays.contains('Mon')),
+                      _buildDayChip('Tue', screenSize, doctor.availableDays.contains('Tue')),
+                      _buildDayChip('Wed', screenSize, doctor.availableDays.contains('Wed')),
+                      _buildDayChip('Thu', screenSize, doctor.availableDays.contains('Thu')),
+                      _buildDayChip('Fri', screenSize, doctor.availableDays.contains('Fri')),
+                      _buildDayChip('Sat', screenSize, doctor.availableDays.contains('Sat')),
                     ],
                   ),
                 ],
               ),
             ),
           ),
-
-          // ── Absolute Positioned Doctor Image ──────────────────────────────
           Positioned(
-            top: -screenSize.height * 0.015, // Moves the image HIGHER to ensure it pops out
+            top: -screenSize.height * 0.015,
             right: horizontalPadding,
             child: SizedBox(
               width: screenSize.width * 0.32,
-              height: screenSize.width * 0.4, // Taller box for the pop-out effect
+              height: screenSize.width * 0.4,
               child: Builder(
                 builder: (context) {
                   final url = GlobalApi.getImageUrl(doctor.imageAsset);
@@ -454,8 +410,10 @@ class _DoctorCard extends StatelessWidget {
                       imageUrl: url,
                       fit: BoxFit.contain,
                       alignment: Alignment.bottomCenter,
-                      placeholder: (context, _) => _buildAvatarFallback(screenSize, isChild: true),
-                      errorWidget: (context, _, __) => _buildAvatarFallback(screenSize, isChild: true),
+                      placeholder: (context, _) =>
+                          _buildAvatarFallback(screenSize, isChild: true),
+                      errorWidget: (context, _, __) =>
+                          _buildAvatarFallback(screenSize, isChild: true),
                     );
                   }
                   return _buildAvatarFallback(screenSize, isChild: true);
@@ -478,25 +436,15 @@ class _DoctorCard extends StatelessWidget {
       ),
       child: Center(
         child: Text(
-          doctor.name
-              .split(' ')
-              .map((n) => n.isNotEmpty ? n[0] : '')
-              .take(2)
-              .join('')
-              .toUpperCase(),
+          doctor.name.split(' ').map((n) => n.isNotEmpty ? n[0] : '').take(2).join('').toUpperCase(),
           style: TextStyle(
-            color: doctor.avatarColor,
-            fontWeight: FontWeight.bold,
-            fontSize: screenSize.width * 0.08,
-          ),
+              color: doctor.avatarColor,
+              fontWeight: FontWeight.bold,
+              fontSize: screenSize.width * 0.08),
         ),
       ),
     );
-
-    if (isChild) {
-      // Use Align bottom to ensure it sits on the base line but sticks out if the parent is tall
-      return Align(alignment: Alignment.bottomCenter, child: avatar);
-    }
+    if (isChild) return Align(alignment: Alignment.bottomCenter, child: avatar);
     return avatar;
   }
 
@@ -509,15 +457,217 @@ class _DoctorCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(screenSize.width * 0.025),
       ),
       child: Center(
-        child: Text(
-          day,
-          style: TextStyle(
-            fontSize: screenSize.width * 0.03,
-            fontWeight: FontWeight.bold,
-            color: isAvailable ? Colors.white : Colors.grey.shade500,
+        child: Text(day,
+            style: TextStyle(
+                fontSize: screenSize.width * 0.03,
+                fontWeight: FontWeight.bold,
+                color: isAvailable ? Colors.white : Colors.grey.shade500)),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+//  LEGEND DOT  (reusable)
+// ─────────────────────────────────────────────
+class _LegendDot extends StatelessWidget {
+  final Color color;
+  final String label;
+
+  const _LegendDot({required this.color, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        const SizedBox(width: 4),
+        Text(label,
+            style: TextStyle(fontSize: 10, color: Colors.grey.shade500)),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+//  GROUPED BAR CHART  ← NEW (from Orders screen style)
+//  3 bars per shift: OPD Revenue | Consult Revenue | Patients
+//  X-axis labels: Morning · Evening · Night
+// ─────────────────────────────────────────────
+class _ShiftGroupedBarChart extends StatelessWidget {
+  final DashboardProvider prov;
+
+  const _ShiftGroupedBarChart({required this.prov});
+
+  static const _shifts = ['Morning', 'Evening', 'Night'];
+
+  // Normalise PKR revenue to a 0-55 display scale so bars look proportional.
+  // Patients are shown as-is (usually small numbers, clamped to 55).
+  List<List<double>> _buildData() {
+    double maxRev = 1;
+    for (final s in _shifts) {
+      final opd = (prov.shiftOpdRevenue[s] ?? 0).toDouble();
+      final consult = (prov.shiftConsultRevenue[s] ?? 0).toDouble();
+      if (opd > maxRev) maxRev = opd;
+      if (consult > maxRev) maxRev = consult;
+    }
+
+    return List.generate(_shifts.length, (i) {
+      final s = _shifts[i];
+      final opd = (prov.shiftOpdRevenue[s] ?? 0).toDouble();
+      final consult = (prov.shiftConsultRevenue[s] ?? 0).toDouble();
+      final pts = (prov.shiftPatientCount[s] ?? 0).toDouble();
+      return [
+        (opd / maxRev) * 55,
+        (consult / maxRev) * 55,
+        pts.clamp(0, 55).toDouble(),
+      ];
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final data = _buildData();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── Legend (matches Orders screen style) ─────────────────────────────
+        Row(
+          children: const [
+            _LegendDot(color: Color(0xFF10B981), label: 'OPD Rev'),
+            SizedBox(width: 12),
+            _LegendDot(color: Colors.indigo, label: 'Consult Rev'),
+            SizedBox(width: 12),
+            _LegendDot(color: Color(0xFFF59E0B), label: 'Patients'),
+          ],
+        ),
+        const SizedBox(height: 8),
+
+        // ── Bar Chart ─────────────────────────────────────────────────────────
+        SizedBox(
+          height: 200,
+          child: BarChart(
+            BarChartData(
+              maxY: 60,
+              minY: 0,
+              alignment: BarChartAlignment.spaceAround,
+
+              // Grid — horizontal lines only (matches Orders screen)
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                horizontalInterval: 10,
+                getDrawingHorizontalLine: (_) => FlLine(
+                  color: Colors.grey.shade100,
+                  strokeWidth: 1,
+                ),
+              ),
+
+              borderData: FlBorderData(
+                show: true,
+                border: Border.all(color: Colors.grey.shade100),
+              ),
+
+              titlesData: FlTitlesData(
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 28,
+                    interval: 10,
+                    getTitlesWidget: (value, meta) => Text(
+                      value.toInt().toString(),
+                      style: const TextStyle(
+                          fontSize: 9, color: Color(0xFF94A3B8)),
+                    ),
+                  ),
+                ),
+                rightTitles:
+                AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                topTitles:
+                AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 28,
+                    getTitlesWidget: (value, meta) {
+                      final i = value.toInt();
+                      if (i < 0 || i >= _shifts.length) return const SizedBox();
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          _shifts[i],
+                          style: const TextStyle(
+                              fontSize: 9, color: Color(0xFF94A3B8)),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+
+              // Tooltip shows actual PKR values (not normalised display values)
+              barTouchData: BarTouchData(
+                touchTooltipData: BarTouchTooltipData(
+                  getTooltipColor: (_) => Colors.black87,
+                  tooltipRoundedRadius: 8,
+                  getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                    final shift = _shifts[groupIndex];
+                    final labels = ['OPD', 'Consult', 'Patients'];
+                    final rawValues = [
+                      prov.shiftOpdRevenue[shift] ?? 0,
+                      prov.shiftConsultRevenue[shift] ?? 0,
+                      prov.shiftPatientCount[shift] ?? 0,
+                    ];
+                    final display = rodIndex < 2
+                        ? 'PKR ${NumberFormat('#,###').format(rawValues[rodIndex])}'
+                        : rawValues[rodIndex].toString();
+                    return BarTooltipItem(
+                      '${labels[rodIndex]}\n$display',
+                      const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600),
+                    );
+                  },
+                ),
+              ),
+
+              // 3 rods per group — same structure as Orders screen
+              barGroups: List.generate(_shifts.length, (i) {
+                return BarChartGroupData(
+                  x: i,
+                  barsSpace: 4,
+                  barRods: [
+                    BarChartRodData(
+                      toY: data[i][0],
+                      width: 10,
+                      color: const Color(0xFF10B981),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                    BarChartRodData(
+                      toY: data[i][1],
+                      width: 10,
+                      color: Colors.indigo,
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                    BarChartRodData(
+                      toY: data[i][2],
+                      width: 10,
+                      color: const Color(0xFFF59E0B),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ],
+                );
+              }),
+            ),
           ),
         ),
-      ),
+      ],
     );
   }
 }
@@ -540,12 +690,9 @@ class _DashboardBodyState extends State<_DashboardBody> {
   void initState() {
     super.initState();
     final prov = Provider.of<DashboardProvider>(context, listen: false);
-    
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      // Ensure we start with today's date and 'All' shifts
       prov.resetToToday();
-      // Set loading immediately to avoid showing old data for 1 frame
       prov.resetLoading();
       prov.fetchAvailableShifts(prov.selectedDate);
       prov.fetchCalendarData(prov.selectedDate);
@@ -563,12 +710,8 @@ class _DashboardBodyState extends State<_DashboardBody> {
       child: CustomPageTransition(
         child: dashboardProv.isLoading
             ? Center(
-          key: const ValueKey('loader'),
-          child: CustomLoader(
-            size: 50,
-            color: _teal,
-          ),
-        )
+            key: const ValueKey('loader'),
+            child: CustomLoader(size: 50, color: _teal))
             : SingleChildScrollView(
           key: const ValueKey('content'),
           physics: const AlwaysScrollableScrollPhysics(
@@ -577,112 +720,109 @@ class _DashboardBodyState extends State<_DashboardBody> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-                  // ── Header ──────────────────────────────────────────────────────
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _dateFormat.format(dashboardProv.selectedDate),
-                              style: TextStyle(
-                                  color: Colors.grey.shade500, fontSize: 13),
-                            ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.offline_pin_rounded, color: _teal),
-                        onPressed: () => Navigator.pushReplacement(
-                          context,
-                          PageRouteBuilder(
-                            pageBuilder: (context, _, __) => const OfflineDashboardScreen(),
-                            transitionDuration: Duration.zero,
-                          ),
-                        ),
-                      ),
-                    ],
+              // ── Header ───────────────────────────────────────────────
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      _dateFormat.format(dashboardProv.selectedDate),
+                      style: TextStyle(
+                          color: Colors.grey.shade500, fontSize: 13),
+                    ),
                   ),
-                  const SizedBox(height: 10),
-
-                  // ── Date + shift filters ─────────────────────────────────────────
-                  Row(
-                    children: [
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () async {
-                            final picked = await showDatePicker(
-                              context: context,
-                              initialDate: dashboardProv.selectedDate,
-                              firstDate: DateTime(2020),
-                              lastDate: DateTime(2030),
-                            );
-                            if (picked != null) dashboardProv.setSelectedDate(picked);
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 12),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: Colors.grey.shade100),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.calendar_today_rounded,
-                                    size: 14, color: Colors.grey.shade400),
-                                const SizedBox(width: 8),
-                                Text(
-                                  DateFormat('dd/MM/yyyy')
-                                      .format(dashboardProv.selectedDate),
-                                  style: const TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                      color: Color(0xFF334155)),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
+                  IconButton(
+                    icon: const Icon(Icons.offline_pin_rounded,
+                        color: _teal),
+                    onPressed: () => Navigator.pushReplacement(
+                      context,
+                      PageRouteBuilder(
+                        pageBuilder: (context, _, __) =>
+                        const OfflineDashboardScreen(),
+                        transitionDuration: Duration.zero,
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.grey.shade100),
-                          ),
-                          child: DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
-                              value: dashboardProv.selectedShiftType,
-                              isExpanded: true,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+
+              // ── Date + shift filters ──────────────────────────────────
+              Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: dashboardProv.selectedDate,
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime(2030),
+                        );
+                        if (picked != null)
+                          dashboardProv.setSelectedDate(picked);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.grey.shade100),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.calendar_today_rounded,
+                                size: 14, color: Colors.grey.shade400),
+                            const SizedBox(width: 8),
+                            Text(
+                              DateFormat('dd/MM/yyyy')
+                                  .format(dashboardProv.selectedDate),
                               style: const TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
                                   color: Color(0xFF334155)),
-                              items: ['All', 'Morning', 'Evening', 'Night']
-                                  .map((t) => DropdownMenuItem(
-                                  value: t,
-                                  child: Text(
-                                      t == 'All' ? 'All Shifts' : t)))
-                                  .toList(),
-                              onChanged: (val) =>
-                                  dashboardProv.setSelectedShiftType(val!),
                             ),
-                          ),
+                          ],
                         ),
                       ),
-                    ],
+                    ),
                   ),
-                  // const SizedBox(height: 20),
-                  // const SizedBox(height: 10),
-                  // ── 2×2 compact summary cards ──────────────────────────────────
-              // ── 2×2 compact summary cards ──────────────────────────────────
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Container(
+                      padding:
+                      const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.grey.shade100),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: dashboardProv.selectedShiftType,
+                          isExpanded: true,
+                          style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF334155)),
+                          items: ['All', 'Morning', 'Evening', 'Night']
+                              .map((t) => DropdownMenuItem(
+                              value: t,
+                              child: Text(
+                                  t == 'All' ? 'All Shifts' : t)))
+                              .toList(),
+                          onChanged: (val) =>
+                              dashboardProv.setSelectedShiftType(val!),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              // ── 2×2 summary cards ─────────────────────────────────────
               GridView.count(
                 padding: const EdgeInsets.only(top: 8, bottom: 16),
                 crossAxisCount: 2,
@@ -726,7 +866,8 @@ class _DashboardBodyState extends State<_DashboardBody> {
                     delay: const Duration(milliseconds: 300),
                     child: _SummaryCard(
                       title: 'Patients',
-                      numericValue: dashboardProv.totalPatients.toDouble(),
+                      numericValue:
+                      dashboardProv.totalPatients.toDouble(),
                       isCurrency: false,
                       icon: Icons.people_outline_rounded,
                       color: Colors.cyan.shade600,
@@ -751,64 +892,28 @@ class _DashboardBodyState extends State<_DashboardBody> {
                   ),
                 ],
               ),
-              // const SizedBox(height: 4),
 
-              // ── Revenue by Shift chart ──────────────────────────────────────
+              // ── Revenue by Shift — Grouped Bar Chart ──────────────────
               FadeInUp(
                 duration: const Duration(milliseconds: 500),
                 delay: const Duration(milliseconds: 500),
                 child: _buildGlassPanel(
                   title: 'Revenue by Shift',
-                  subtitle: 'OPD vs Consultation split',
-                  trailing: Row(
-                    children: [
-                      _chartLegend('Morning', const Color(0xFF10B981)),
-                      const SizedBox(width: 8),
-                      _chartLegend('Evening', Colors.indigo),
-                      const SizedBox(width: 8),
-                      _chartLegend('Night', Colors.amber),
-                    ],
-                  ),
-                  child: SizedBox(
-                    height: MediaQuery.of(context).size.height * 0.3,
-                    child: SfCartesianChart(
-                      key: ValueKey('shift_rev_${dashboardProv.selectedDate}_${dashboardProv.selectedShiftType}'),
-                      margin: EdgeInsets.zero,
-                      plotAreaBorderWidth: 0,
-                      primaryXAxis: CategoryAxis(
-                        majorGridLines: const MajorGridLines(width: 0),
-                        axisLine: const AxisLine(width: 0),
-                        labelStyle: const TextStyle(
-                            fontSize: 10, color: Colors.grey),
-                      ),
-                      primaryYAxis: NumericAxis(
-                        majorGridLines: MajorGridLines(
-                            width: 1,
-                            color: Colors.grey.shade100,
-                            dashArray: const [4, 4]),
-                        axisLine: const AxisLine(width: 0),
-                        axisLabelFormatter: (details) => ChartAxisLabel(
-                            '${(details.value / 1000).toStringAsFixed(0)}k',
-                            const TextStyle(
-                                fontSize: 10, color: Colors.grey)),
-                      ),
-                      tooltipBehavior:
-                      TooltipBehavior(enable: true, header: ''),
-                      series: _getColumnSeries(dashboardProv),
-                    ),
-                  ),
+                  subtitle: 'OPD · Consultation · Patients',
+                  child: _ShiftGroupedBarChart(prov: dashboardProv),
                 ),
               ),
               const SizedBox(height: 20),
+
+              // ── Monthly Appointments calendar ─────────────────────────
               FadeInUp(
                 duration: const Duration(milliseconds: 500),
                 delay: const Duration(milliseconds: 600),
                 child: _buildCalendarPanel(dashboardProv),
               ),
               const SizedBox(height: 20),
-              // const SizedBox(height: 24),
 
-              // ── Revenue Trend ───────────────────────────────────────────────
+              // ── Revenue Trend (Syncfusion line — unchanged) ───────────
               FadeInUp(
                 duration: const Duration(milliseconds: 500),
                 delay: const Duration(milliseconds: 700),
@@ -830,35 +935,42 @@ class _DashboardBodyState extends State<_DashboardBody> {
                       SizedBox(
                         height: 120,
                         child: SfCartesianChart(
-                          key: ValueKey('trend_${dashboardProv.selectedDate}'),
+                          key: ValueKey(
+                              'trend_${dashboardProv.selectedDate}'),
                           margin: EdgeInsets.zero,
                           plotAreaBorderWidth: 0,
                           primaryXAxis: CategoryAxis(
-                            majorGridLines: const MajorGridLines(width: 0),
+                            majorGridLines:
+                            const MajorGridLines(width: 0),
                             axisLine: const AxisLine(width: 0),
-                            majorTickLines: const MajorTickLines(size: 0),
-                            labelStyle: const TextStyle(fontSize: 9, color: Color(0xFF94A3B8)),
+                            majorTickLines:
+                            const MajorTickLines(size: 0),
+                            labelStyle: const TextStyle(
+                                fontSize: 9,
+                                color: Color(0xFF94A3B8)),
                           ),
                           primaryYAxis: NumericAxis(isVisible: false),
                           series: <CartesianSeries>[
                             LineSeries<ChartDataPoint, String>(
                               animationDuration: 0,
                               dataSource: dashboardProv.trendData,
-                              xValueMapper: (ChartDataPoint data, _) =>
-                              data.x,
-                              yValueMapper: (ChartDataPoint data, _) =>
-                              data.y,
-                              dataLabelMapper: (ChartDataPoint data, _) =>
+                              xValueMapper:
+                                  (ChartDataPoint data, _) => data.x,
+                              yValueMapper:
+                                  (ChartDataPoint data, _) => data.y,
+                              dataLabelMapper:
+                                  (ChartDataPoint data, _) =>
                               'PKR ${NumberFormat('#,###').format(data.y)}',
                               color: const Color(0xFF10B981),
                               width: 2,
-                              markerSettings: const MarkerSettings(isVisible: true),
-                              dataLabelSettings: const DataLabelSettings(
+                              markerSettings:
+                              const MarkerSettings(isVisible: true),
+                              dataLabelSettings:
+                              const DataLabelSettings(
                                 isVisible: true,
                                 textStyle: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold),
                               ),
                             ),
                           ],
@@ -870,7 +982,7 @@ class _DashboardBodyState extends State<_DashboardBody> {
               ),
               const SizedBox(height: 20),
 
-              // ── Available Doctors ───────────────────────────────────────────
+              // ── Available Doctors ─────────────────────────────────────
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -880,13 +992,11 @@ class _DashboardBodyState extends State<_DashboardBody> {
                           fontWeight: FontWeight.bold,
                           color: Colors.black87)),
                   GestureDetector(
-                    onTap: () {
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => const ConsultationScreen()),
-                      );
-                    },
+                    onTap: () => Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const ConsultationScreen()),
+                    ),
                     child: Text('View all',
                         style: TextStyle(
                             fontSize: 13,
@@ -901,28 +1011,28 @@ class _DashboardBodyState extends State<_DashboardBody> {
               else if (consultationProv.doctors.isEmpty)
                 const Center(child: Text('No doctors available'))
               else
-              FadeInUp(
-                duration: const Duration(milliseconds: 500),
-                delay: const Duration(milliseconds: 800),
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  padding: EdgeInsets.zero,
-                  itemCount: consultationProv.doctors.length,
-                  itemBuilder: (context, index) {
-                    final doctor = consultationProv.doctors[index];
-                    return _DoctorCard(
-                      doctor: doctor,
-                      availableSlots:
-                      consultationProv.availableSlotsForDoctor(
-                          doctor.name, DateTime.now()),
-                      primaryColor: primaryColor,
-                      onTap: () =>
-                          _showDialog(context, consultationProv, doctor),
-                    );
-                  },
+                FadeInUp(
+                  duration: const Duration(milliseconds: 500),
+                  delay: const Duration(milliseconds: 800),
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: EdgeInsets.zero,
+                    itemCount: consultationProv.doctors.length,
+                    itemBuilder: (context, index) {
+                      final doctor = consultationProv.doctors[index];
+                      return _DoctorCard(
+                        doctor: doctor,
+                        availableSlots:
+                        consultationProv.availableSlotsForDoctor(
+                            doctor.name, DateTime.now()),
+                        primaryColor: primaryColor,
+                        onTap: () => _showDialog(
+                            context, consultationProv, doctor),
+                      );
+                    },
+                  ),
                 ),
-              ),
               const SizedBox(height: 120),
             ],
           ),
@@ -931,7 +1041,7 @@ class _DashboardBodyState extends State<_DashboardBody> {
     );
   }
 
-  // ── Glass panel ─────────────────────────────────────────────────────────────
+  // ── Glass panel ───────────────────────────────────────────────────────────
   Widget _buildGlassPanel({
     required String title,
     required String subtitle,
@@ -980,7 +1090,7 @@ class _DashboardBodyState extends State<_DashboardBody> {
     );
   }
 
-  // ── Calendar panel ──────────────────────────────────────────────────────────
+  // ── Calendar panel ────────────────────────────────────────────────────────
   Widget _buildCalendarPanel(DashboardProvider prov) {
     return _buildGlassPanel(
       title: 'Monthly Appointments',
@@ -1097,8 +1207,7 @@ class _DashboardBodyState extends State<_DashboardBody> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                  DateFormat('EEEE, MMM d')
-                      .format(DateTime.parse(date)),
+                  DateFormat('EEEE, MMM d').format(DateTime.parse(date)),
                   style: TextStyle(
                       fontSize: size.width * 0.045,
                       fontWeight: FontWeight.bold)),
@@ -1111,20 +1220,17 @@ class _DashboardBodyState extends State<_DashboardBody> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Padding(
-                        padding: const EdgeInsets.symmetric(
-                            vertical: 8.0),
+                        padding:
+                        const EdgeInsets.symmetric(vertical: 8.0),
                         child: Row(children: [
                           const Icon(Icons.person_rounded,
-                              size: 16,
-                              color: Color(0xFF10B981)),
+                              size: 16, color: Color(0xFF10B981)),
                           const SizedBox(width: 8),
                           Expanded(
                               child: Text(entry.key,
                                   style: const TextStyle(
-                                      fontWeight:
-                                      FontWeight.bold),
-                                  overflow:
-                                  TextOverflow.ellipsis)),
+                                      fontWeight: FontWeight.bold),
+                                  overflow: TextOverflow.ellipsis)),
                           Text('${entry.value.length} Appts',
                               style: TextStyle(
                                   fontSize: 12,
@@ -1139,38 +1245,47 @@ class _DashboardBodyState extends State<_DashboardBody> {
                         decoration: BoxDecoration(
                             color: Colors.grey.shade50,
                             borderRadius:
-                            BorderRadius.circular(
-                                12)),
+                            BorderRadius.circular(12)),
                         child: Row(children: [
                           Expanded(
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                        appt['patient_name'] ??
-                                            'Unknown',
-                                        style: const TextStyle(
-                                            fontSize: 13),
-                                        overflow: TextOverflow
-                                            .ellipsis),
-                                  ),
-                                  if (appt['token_number'] != null) ...[
-                                    const SizedBox(width: 8),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: _teal.withOpacity(0.08),
-                                        borderRadius: BorderRadius.circular(4),
-                                        border: Border.all(color: _teal.withOpacity(0.3)),
-                                      ),
-                                      child: Text(
-                                        'T-${appt['token_number']}',
-                                        style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: _teal),
-                                      ),
+                              child: Row(children: [
+                                Expanded(
+                                  child: Text(
+                                      appt['patient_name'] ??
+                                          'Unknown',
+                                      style: const TextStyle(
+                                          fontSize: 13),
+                                      overflow:
+                                      TextOverflow.ellipsis),
+                                ),
+                                if (appt['token_number'] !=
+                                    null) ...[
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding:
+                                    const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color:
+                                      _teal.withOpacity(0.08),
+                                      borderRadius:
+                                      BorderRadius.circular(4),
+                                      border: Border.all(
+                                          color: _teal
+                                              .withOpacity(0.3)),
                                     ),
-                                  ],
+                                    child: Text(
+                                      'T-${appt['token_number']}',
+                                      style: const TextStyle(
+                                          fontSize: 9,
+                                          fontWeight:
+                                          FontWeight.bold,
+                                          color: _teal),
+                                    ),
+                                  ),
                                 ],
-                              )),
+                              ])),
                           const SizedBox(width: 12),
                           Text(
                               (appt['slot_time'] ?? '')
@@ -1178,8 +1293,8 @@ class _DashboardBodyState extends State<_DashboardBody> {
                                   .substring(0, 5),
                               style: TextStyle(
                                   fontSize: 11,
-                                  color: Colors
-                                      .grey.shade400))
+                                  color:
+                                  Colors.grey.shade400))
                         ]),
                       ))
                           .toList(),
@@ -1199,57 +1314,12 @@ class _DashboardBodyState extends State<_DashboardBody> {
     );
   }
 
-  List<CartesianSeries<ChartDataPoint, String>> _getColumnSeries(
-      DashboardProvider prov) {
-    return [
-      ColumnSeries<ChartDataPoint, String>(
-        animationDuration: 0,
-        name: 'Morning',
-        dataSource: [
-          ChartDataPoint('OPD', prov.shiftOpdRevenue['Morning'] ?? 0),
-          ChartDataPoint(
-              'Consultation', prov.shiftConsultRevenue['Morning'] ?? 0)
-        ],
-        xValueMapper: (ChartDataPoint d, _) => d.x,
-        yValueMapper: (ChartDataPoint d, _) => d.y,
-        color: const Color(0xFF10B981),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
-      ),
-      ColumnSeries<ChartDataPoint, String>(
-        animationDuration: 0,
-        name: 'Evening',
-        dataSource: [
-          ChartDataPoint('OPD', prov.shiftOpdRevenue['Evening'] ?? 0),
-          ChartDataPoint(
-              'Consultation', prov.shiftConsultRevenue['Evening'] ?? 0)
-        ],
-        xValueMapper: (ChartDataPoint d, _) => d.x,
-        yValueMapper: (ChartDataPoint d, _) => d.y,
-        color: Colors.indigo,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
-      ),
-      ColumnSeries<ChartDataPoint, String>(
-        animationDuration: 0,
-        name: 'Night',
-        dataSource: [
-          ChartDataPoint('OPD', prov.shiftOpdRevenue['Night'] ?? 0),
-          ChartDataPoint('Consultation', prov.shiftConsultRevenue['Night'] ?? 0)
-        ],
-        xValueMapper: (ChartDataPoint d, _) => d.x,
-        yValueMapper: (ChartDataPoint d, _) => d.y,
-        color: Colors.amber,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
-      ),
-    ];
-  }
-
   Widget _chartLegend(String label, Color color) {
     return Row(children: [
       Container(
           width: 8,
           height: 8,
-          decoration:
-          BoxDecoration(color: color, shape: BoxShape.circle)),
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
       const SizedBox(width: 4),
       Text(label,
           style: TextStyle(fontSize: 10, color: Colors.grey.shade500))
@@ -1290,11 +1360,9 @@ class _DashboardBodyState extends State<_DashboardBody> {
                     fontSize: 12, fontWeight: FontWeight.w600)),
           ]),
           Text(pts.toString(),
-              style: const TextStyle(
-                  fontSize: 12, fontFamily: 'monospace')),
+              style: const TextStyle(fontSize: 12, fontFamily: 'monospace')),
           Text((prov.shiftConsultCount[shift] ?? 0).toString(),
-              style: const TextStyle(
-                  fontSize: 12, fontFamily: 'monospace')),
+              style: const TextStyle(fontSize: 12, fontFamily: 'monospace')),
           Text(NumberFormat.compact().format(rev),
               style: const TextStyle(
                   fontSize: 12,
@@ -1341,13 +1409,12 @@ class _DashboardBodyState extends State<_DashboardBody> {
         return MultiProvider(
           providers: [
             ChangeNotifierProvider.value(value: prov),
-            ChangeNotifierProvider.value(
-                value: context.read<MrProvider>()),
+            ChangeNotifierProvider.value(value: context.read<MrProvider>()),
           ],
           child: AppointmentDialog(
             doctor: doctor,
-            availableSlots: prov.availableSlotsForDoctor(
-                doctor.name, DateTime.now()),
+            availableSlots:
+            prov.availableSlotsForDoctor(doctor.name, DateTime.now()),
           ),
         );
       },
@@ -1377,9 +1444,15 @@ class DashboardScreen extends StatelessWidget {
                 children: [
                   Icon(Icons.lock_outline, size: 64, color: Color(0xFFCBD5E0)),
                   SizedBox(height: 16),
-                  Text('Access Denied', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF4A5568))),
+                  Text('Access Denied',
+                      style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF4A5568))),
                   SizedBox(height: 8),
-                  Text('You do not have permission to view the Dashboard.', style: TextStyle(color: Color(0xFF718096))),
+                  Text(
+                      'You do not have permission to view the Dashboard.',
+                      style: TextStyle(color: Color(0xFF718096))),
                 ],
               ),
             );

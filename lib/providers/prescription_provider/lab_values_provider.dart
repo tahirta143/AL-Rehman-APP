@@ -19,8 +19,12 @@ class LabValuesProvider with ChangeNotifier {
   // ─── Actions ─────────────────────────────────────────────────────
 
   Future<void> loadLabValues({String? mrNumber, String? receiptId}) async {
-    if (mrNumber == null && receiptId == null) {
+    final hasMr = mrNumber != null && mrNumber.trim().isNotEmpty;
+    final hasReceipt = receiptId != null && receiptId.trim().isNotEmpty;
+
+    if (!hasMr && !hasReceipt) {
       _sheet = LabValuesSheetModel();
+      _isLoading = false; // Ensure loading is false
       notifyListeners();
       return;
     }

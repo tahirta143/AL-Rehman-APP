@@ -5,11 +5,10 @@ import '../../providers/prescription_provider/prescription_provider.dart';
 import '../../core/providers/permission_provider.dart';
 import '../../core/permissions/permission_keys.dart';
 import '../../models/prescription_model/prescription_model.dart';
-import '../../models/mr_model/mr_patient_model.dart';
 import '../../models/vitals_model/vitals_model.dart';
-import '../../core/utils/date_formatter.dart';
 import '../../custum widgets/custom_loader.dart';
 import '../../core/services/pdf_eye_prescription_service.dart';
+import '../../core/utils/wait_time_helper.dart';
 import '../../main.dart';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -118,13 +117,59 @@ class _EyeConsultationDropdown extends StatelessWidget {
           value: null,
           onChanged: (val) => provider.selectConsultationPatient(val, department: 'Eye'),
           items: provider.consultationPatients.map((p) {
+            final waitTime = WaitTimeHelper.getWaitTime(p['date'], p['time']);
             return DropdownMenuItem(
               value: p,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(p['patient_name'] ?? '', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  Row(
+                    children: [
+                      Text(p['patient_name'] ?? '', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      if (p['token_number'] != null) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: kTeal,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(color: kTeal.withValues(alpha: 0.3), blurRadius: 4, offset: const Offset(0, 1)),
+                            ],
+                          ),
+                          child: Text(
+                            'T#${p['token_number']}',
+                            style: const TextStyle(
+                              fontSize: 8,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                      ],
+                      if (waitTime != null) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.shade50,
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: Colors.amber.shade200),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.access_time, size: 8, color: Colors.amber.shade800),
+                              const SizedBox(width: 4),
+                              Text(waitTime, style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.amber.shade800)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                   Text('MR: ${p['patient_mr_number']} | ${p['receipt_id']}', style: const TextStyle(fontSize: 10, color: kTextMid)),
                 ],
               ),
@@ -194,13 +239,14 @@ class _EyeConsultationSidebarState extends State<_EyeConsultationSidebar> {
                         itemBuilder: (context, idx) {
                           final p = provider.consultationPatients[idx];
                           final isPending = p['sync_status'] == 'pending';
+                          final waitTime = WaitTimeHelper.getWaitTime(p['date'], p['time']);
                           return ListTile(
                             dense: true,
                             onTap: () => provider.selectConsultationPatient(p, department: 'Eye'),
                             title: Row(
                               children: [
                                 Expanded(child: Text(p['patient_name'] ?? '', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
-                                if (isPending)
+                                if (isPending) ...[
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
@@ -217,9 +263,47 @@ class _EyeConsultationSidebarState extends State<_EyeConsultationSidebar> {
                                       ],
                                     ),
                                   ),
+                                  const SizedBox(width: 8),
+                                ] else if (p['token_number'] != null) ...[
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: kTeal,
+                                      borderRadius: BorderRadius.circular(12),
+                                      boxShadow: [
+                                        BoxShadow(color: kTeal.withValues(alpha: 0.3), blurRadius: 4, offset: const Offset(0, 1)),
+                                      ],
+                                    ),
+                                    child: Text(
+                                      '#${p['token_number']}',
+                                      style: const TextStyle(
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w900,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                ],
                               ],
                             ),
-                            subtitle: Text(p['service_detail'] ?? '', style: const TextStyle(fontSize: 10, color: kTextMid)),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(p['service_detail'] ?? '', style: const TextStyle(fontSize: 10, color: kTextMid)),
+                                if (waitTime != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 2),
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.access_time, size: 10, color: Colors.amber.shade700),
+                                        const SizedBox(width: 4),
+                                        Text(waitTime, style: TextStyle(fontSize: 9, color: Colors.amber.shade800, fontWeight: FontWeight.w500)),
+                                      ],
+                                    ),
+                                  ),
+                              ],
+                            ),
                             trailing: Text(p['patient_mr_number']?.toString() ?? '', style: const TextStyle(fontSize: 10, color: Color(0xFF2563EB), fontWeight: FontWeight.bold)),
                           );
                         },
@@ -466,7 +550,7 @@ class _VitalsSummaryBox extends StatelessWidget {
   }
 }
 
-class _InputField extends StatelessWidget {
+class _InputField extends StatefulWidget {
   final String label;
   final String hint;
   final bool required;
@@ -486,27 +570,60 @@ class _InputField extends StatelessWidget {
   });
 
   @override
+  State<_InputField> createState() => _InputFieldState();
+}
+
+class _InputFieldState extends State<_InputField> {
+  late TextEditingController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = widget.controller ?? TextEditingController(text: widget.initialValue);
+  }
+
+  @override
+  void didUpdateWidget(_InputField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Use .value instead of .text to atomically update text + cursor,
+    // preventing RangeError when IME tries to restore a stale offset.
+    if (widget.controller == null && widget.initialValue != oldWidget.initialValue) {
+      final newText = widget.initialValue ?? '';
+      _ctrl.value = TextEditingValue(
+        text: newText,
+        selection: TextSelection.collapsed(offset: newText.length),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    if (widget.controller == null) _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: kTextMid)),
-            if (required) const Text(' *', style: TextStyle(color: Colors.red, fontSize: 11)),
+            Text(widget.label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: kTextMid)),
+            if (widget.required) const Text(' *', style: TextStyle(color: Colors.red, fontSize: 11)),
           ],
         ),
         const SizedBox(height: 4),
         TextField(
-          controller: controller ?? (initialValue != null ? TextEditingController(text: initialValue) : null),
-          readOnly: readOnly,
-          onSubmitted: onSubmitted,
+          controller: _ctrl,
+          readOnly: widget.readOnly,
+          onSubmitted: widget.onSubmitted,
           style: const TextStyle(fontSize: 12),
           decoration: InputDecoration(
-            hintText: hint,
+            hintText: widget.hint,
             isDense: true,
-            filled: readOnly,
-            fillColor: readOnly ? kBg : kWhite,
+            filled: widget.readOnly,
+            fillColor: widget.readOnly ? kBg : kWhite,
             contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: kBorder)),
             enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: kBorder)),
@@ -1300,7 +1417,7 @@ class _EyeMedModeToggle extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _buildBtn('Medicine', 'medicine', Icons.medical_services, const Color(0xFF2563EB)),
+          _buildBtn('Medicine', 'medicine', Icons.medical_services, const Color(0xFF00B5AD)),
           _buildBtn('Formula', 'formula', Icons.science, const Color(0xFF16A34A)),
         ],
       ),
@@ -1335,16 +1452,44 @@ class _EyeLanguageIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        const Icon(Icons.language, size: 14, color: Colors.blue),
-        const SizedBox(width: 4),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-          decoration: BoxDecoration(color: const Color(0xFFDBEAFE), borderRadius: BorderRadius.circular(4), border: Border.all(color: const Color(0xFF93C5FD))),
-          child: Text(provider.inputLang == 'ur' ? 'اردو' : 'English', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF1D4ED8))),
+    final isUrdu = provider.inputLang == 'ur';
+    return GestureDetector(
+      onTap: () => provider.setInputLang(isUrdu ? 'en' : 'ur'),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+        decoration: BoxDecoration(
+          color: kWhite,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: kBorder),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 4)],
         ),
-      ],
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _pill('EN', !isUrdu),
+            const SizedBox(width: 2),
+            _pill('اردو', isUrdu),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _pill(String label, bool active) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: active ? kTeal : Colors.transparent,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          color: active ? kWhite : kTextMid,
+        ),
+      ),
     );
   }
 }
@@ -1418,7 +1563,10 @@ class _EyeMedicineSearchAreaState extends State<_EyeMedicineSearchArea> {
                     dense: true,
                     title: Text(name, style: const TextStyle(fontSize: 12)),
                     onTap: () {
-                      _searchCtrl.text = name;
+                      _searchCtrl.value = TextEditingValue(
+                        text: name,
+                        selection: TextSelection.collapsed(offset: name.length),
+                      );
                       _hideOverlay();
                     },
                   );
@@ -1443,12 +1591,16 @@ class _EyeMedicineSearchAreaState extends State<_EyeMedicineSearchArea> {
             TextField(
               controller: _searchCtrl,
               style: const TextStyle(fontSize: 12),
+              textDirection: widget.provider.inputLang == 'ur' ? TextDirection.rtl : TextDirection.ltr,
               onChanged: (val) {
                 widget.provider.updateMedSearch(val);
                 if (val.isNotEmpty) _showOverlay(); else _hideOverlay();
               },
               decoration: InputDecoration(
-                hintText: widget.provider.medMode == 'medicine' ? 'Search medicine...' : 'Search formula...',
+                hintText: widget.provider.inputLang == 'ur'
+                    ? (widget.provider.medMode == 'medicine' ? 'دوائی تلاش کریں...' : 'فارمولا تلاش کریں...')
+                    : (widget.provider.medMode == 'medicine' ? 'Search medicine...' : 'Search formula...'),
+                hintTextDirection: widget.provider.inputLang == 'ur' ? TextDirection.rtl : TextDirection.ltr,
                 prefixIcon: Icon(widget.provider.medMode == 'medicine' ? Icons.medical_services_outlined : Icons.science_outlined, size: 16),
                 isDense: true,
                 filled: true,

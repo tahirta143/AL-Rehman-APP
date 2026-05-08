@@ -145,7 +145,7 @@ class _ConsultationDropdown extends StatelessWidget {
                             ],
                           ),
                           child: Text(
-                            'TOKEN #${p['token_number']}',
+                            'T#${p['token_number']}',
                             style: const TextStyle(
                               fontSize: 8,
                               fontWeight: FontWeight.w900,
@@ -853,8 +853,14 @@ class _InputFieldState extends State<_InputField> {
   @override
   void didUpdateWidget(_InputField oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.initialValue != oldWidget.initialValue) {
-      _ctrl.text = widget.initialValue ?? '';
+    // Use .value instead of .text to atomically update text + cursor,
+    // preventing RangeError when IME tries to restore a stale offset.
+    if (widget.controller == null && widget.initialValue != oldWidget.initialValue) {
+      final newText = widget.initialValue ?? '';
+      _ctrl.value = TextEditingValue(
+        text: newText,
+        selection: TextSelection.collapsed(offset: newText.length),
+      );
     }
   }
 
@@ -1797,16 +1803,44 @@ class _LanguageIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        const Icon(Icons.language, size: 14, color: Colors.blue),
-        const SizedBox(width: 4),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-          decoration: BoxDecoration(color: const Color(0xFFDBEAFE), borderRadius: BorderRadius.circular(4), border: Border.all(color: const Color(0xFF93C5FD))),
-          child: Text(provider.inputLang == 'ur' ? 'اردو' : 'English', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF1D4ED8))),
+    final isUrdu = provider.inputLang == 'ur';
+    return GestureDetector(
+      onTap: () => provider.setInputLang(isUrdu ? 'en' : 'ur'),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+        decoration: BoxDecoration(
+          color: kWhite,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: kBorder),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 4)],
         ),
-      ],
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _pill('EN', !isUrdu),
+            const SizedBox(width: 2),
+            _pill('اردو', isUrdu),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _pill(String label, bool active) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: active ? kTeal : Colors.transparent,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          color: active ? kWhite : kTextMid,
+        ),
+      ),
     );
   }
 }
@@ -1881,7 +1915,10 @@ class _MedicineSearchAreaState extends State<_MedicineSearchArea> {
                     dense: true,
                     title: Text(name, style: const TextStyle(fontSize: 12)),
                     onTap: () {
-                      _searchCtrl.text = name;
+                      _searchCtrl.value = TextEditingValue(
+                        text: name,
+                        selection: TextSelection.collapsed(offset: name.length),
+                      );
                       _hideOverlay();
                     },
                   );
@@ -1906,12 +1943,16 @@ class _MedicineSearchAreaState extends State<_MedicineSearchArea> {
             TextField(
               controller: _searchCtrl,
               style: const TextStyle(fontSize: 12),
+              textDirection: widget.provider.inputLang == 'ur' ? TextDirection.rtl : TextDirection.ltr,
               onChanged: (val) {
                 widget.provider.updateMedSearch(val);
                 if (val.isNotEmpty) _showOverlay(); else _hideOverlay();
               },
               decoration: InputDecoration(
-                hintText: widget.provider.medMode == 'medicine' ? 'Search medicine...' : 'Search formula...',
+                hintText: widget.provider.inputLang == 'ur'
+                    ? (widget.provider.medMode == 'medicine' ? 'دوائی تلاش کریں...' : 'فارمولا تلاش کریں...')
+                    : (widget.provider.medMode == 'medicine' ? 'Search medicine...' : 'Search formula...'),
+                hintTextDirection: widget.provider.inputLang == 'ur' ? TextDirection.rtl : TextDirection.ltr,
                 prefixIcon: Icon(widget.provider.medMode == 'medicine' ? Icons.medical_services_outlined : Icons.science_outlined, size: 16),
                 isDense: true,
                 filled: true,

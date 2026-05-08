@@ -267,7 +267,7 @@ class _HomeBody extends StatelessWidget {
           right: 0,
           bottom: 0, // Sits just behind the top edge of the glass cards
           child: Image.asset(
-            'assets/images/dotor.png',
+            'assets/images/doctor2.png',
             height: headerHeight * 0.75, // Scale nicely inside the header
             fit: BoxFit.contain,
             alignment: Alignment.bottomRight,

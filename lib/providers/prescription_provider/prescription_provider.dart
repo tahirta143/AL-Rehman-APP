@@ -317,59 +317,68 @@ class PrescriptionProvider extends ChangeNotifier {
     for (var c in noteControllers.values) c.clear();
     notifyListeners();
 
-    final mr = mrNumber.trim();
-    bool foundOnline = false;
+    try {
+      final mr = mrNumber.trim();
+      bool foundOnline = false;
 
-    if (_connectivity.isOnline.value) {
-      final result = await _mrApiService.fetchPatientByMR(mr);
-      if (result.success && result.patient != null) {
-        _currentPatient = result.patient!.toPatientModel();
-        foundOnline = true;
-        await fetchDiagnosis(department ?? 'General'); 
-        await fetchVitals(mr, receiptId: _receiptId);
-        await fetchHistory(mr);
-      }
-    }
-
-    if (!foundOnline) {
-      // 📴 Search locally
-      debugPrint('📴 Prescription search: searching local DB for $mr');
-      final db = await _db.database;
-      
-      // Try exact, padded, and device_uuid
-      final searchInput = _normalizeMrNumber(mr);
-      final localRows = await db.query(
-        'patients_local',
-        where: 'mr_number = ? OR mr_number = ? OR device_uuid = ?',
-        whereArgs: [mr, searchInput, mr]
-      );
-
-      if (localRows.isNotEmpty) {
-        _currentPatient = PatientModel.fromLocalMap(localRows.first);
-        debugPrint('✅ Found patient locally: ${_currentPatient?.fullName}');
-      } else {
-        // Try numeric match as last resort
-        final numericInput = mr.replaceAll(RegExp(r'[^0-9]'), '');
-        if (numericInput.isNotEmpty) {
-           final allLocal = await db.query('patients_local');
-           final match = allLocal.firstWhere((p) {
-              final dbMr = (p['mr_number'] ?? '').toString();
-              final dbNumeric = dbMr.replaceAll(RegExp(r'[^0-9]'), '');
-              return dbNumeric.isNotEmpty && (dbNumeric == numericInput || int.tryParse(dbNumeric) == int.tryParse(numericInput));
-           }, orElse: () => {});
-           if (match.isNotEmpty) {
-             _currentPatient = PatientModel.fromLocalMap(match);
-             debugPrint('✅ Found patient locally via numeric match: ${_currentPatient?.fullName}');
-           }
+      if (_connectivity.isOnline.value) {
+        final result = await _mrApiService.fetchPatientByMR(mr);
+        if (result.success && result.patient != null) {
+          _currentPatient = result.patient!.toPatientModel();
+          foundOnline = true;
+          // Notify early so patient info shows up while other details fetch
+          notifyListeners();
+          
+          await fetchDiagnosis(department ?? 'General'); 
+          await fetchVitals(mr, receiptId: _receiptId);
+          await fetchHistory(mr);
         }
       }
-    }
 
-    if (_currentPatient == null) {
-      _errorMessage = 'Patient not found locally or online';
+      if (!foundOnline) {
+        // 📴 Search locally
+        debugPrint('📴 Prescription search: searching local DB for $mr');
+        final db = await _db.database;
+        
+        // Try exact, padded, and device_uuid
+        final searchInput = _normalizeMrNumber(mr);
+        final localRows = await db.query(
+          'patients_local',
+          where: 'mr_number = ? OR mr_number = ? OR device_uuid = ?',
+          whereArgs: [mr, searchInput, mr]
+        );
+
+        if (localRows.isNotEmpty) {
+          _currentPatient = PatientModel.fromLocalMap(localRows.first);
+          debugPrint('✅ Found patient locally: ${_currentPatient?.fullName}');
+        } else {
+          // Try numeric match as last resort
+          final numericInput = mr.replaceAll(RegExp(r'[^0-9]'), '');
+          if (numericInput.isNotEmpty) {
+             final allLocal = await db.query('patients_local');
+             final match = allLocal.firstWhere((p) {
+                final dbMr = (p['mr_number'] ?? '').toString();
+                final dbNumeric = dbMr.replaceAll(RegExp(r'[^0-9]'), '');
+                return dbNumeric.isNotEmpty && (dbNumeric == numericInput || int.tryParse(dbNumeric) == int.tryParse(numericInput));
+             }, orElse: () => {});
+             if (match.isNotEmpty) {
+               _currentPatient = PatientModel.fromLocalMap(match);
+               debugPrint('✅ Found patient locally via numeric match: ${_currentPatient?.fullName}');
+             }
+          }
+        }
+      }
+
+      if (_currentPatient == null) {
+        _errorMessage = 'Patient not found locally or online';
+      }
+    } catch (e) {
+      debugPrint('Error in searchPatient: $e');
+      _errorMessage = 'An error occurred while searching: $e';
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
-    _isLoading = false;
-    notifyListeners();
   }
 
   Future<void> fetchVitals(String mrNumber, {String? receiptId}) async {
@@ -400,13 +409,18 @@ class PrescriptionProvider extends ChangeNotifier {
   Future<void> fetchHistory(String mrNumber) async {
     _isLoadingHistory = true;
     notifyListeners();
-    final res = await _apiService.fetchPrescriptionHistory(mrNumber);
-    if (res['success'] == true) {
-      final List raw = res['data'] ?? [];
-      _prescriptionHistory = raw.map((e) => PrescriptionModel.fromJson(e)).toList();
+    try {
+      final res = await _apiService.fetchPrescriptionHistory(mrNumber);
+      if (res['success'] == true) {
+        final List raw = res['data'] ?? [];
+        _prescriptionHistory = raw.map((e) => PrescriptionModel.fromJson(e)).toList();
+      }
+    } catch (e) {
+      debugPrint('Error fetching history: $e');
+    } finally {
+      _isLoadingHistory = false;
+      notifyListeners();
     }
-    _isLoadingHistory = false;
-    notifyListeners();
   }
 
   Future<void> loadTests() async {
@@ -414,14 +428,18 @@ class PrescriptionProvider extends ChangeNotifier {
     _isLoadingTests = true;
     notifyListeners();
     
-    final labRes = await _apiService.fetchLabTests();
-    if (labRes['success'] == true) _labTests = labRes['data'] ?? [];
+    try {
+      final labRes = await _apiService.fetchLabTests();
+      if (labRes['success'] == true) _labTests = labRes['data'] ?? [];
 
-    final radRes = await _apiService.fetchRadiologyTests();
-    if (radRes['success'] == true) _radiologyTests = radRes['data'] ?? [];
-
-    _isLoadingTests = false;
-    notifyListeners();
+      final radRes = await _apiService.fetchRadiologyTests();
+      if (radRes['success'] == true) _radiologyTests = radRes['data'] ?? [];
+    } catch (e) {
+      debugPrint('Error loading tests: $e');
+    } finally {
+      _isLoadingTests = false;
+      notifyListeners();
+    }
   }
 
   Future<Map<String, dynamic>> searchMedicines(String query) async {
@@ -429,12 +447,17 @@ class PrescriptionProvider extends ChangeNotifier {
   }
 
   Future<void> fetchDiagnosis(String department) async {
-    final res = await _apiService.fetchDiagnosisQuestions(department);
-    if (res['success'] == true) {
-      _diagnosisQuestions = res['data'] ?? [];
-      _diagnosisAnswers = {};
+    try {
+      final res = await _apiService.fetchDiagnosisQuestions(department);
+      if (res['success'] == true) {
+        _diagnosisQuestions = res['data'] ?? [];
+        _diagnosisAnswers = {};
+      }
+    } catch (e) {
+      debugPrint('Error fetching diagnosis: $e');
+    } finally {
+      notifyListeners();
     }
-    notifyListeners();
   }
 
   // ─── GP Form Helpers ──────────────────────────────────────────────
