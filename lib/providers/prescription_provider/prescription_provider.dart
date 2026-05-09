@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:sqflite/sqflite.dart';
 import '../../core/services/pdf_eye_prescription_service.dart';
 import '../../core/services/prescription_api_service.dart';
 import '../../core/services/mr_api_service.dart';
@@ -10,7 +11,6 @@ import '../../core/services/camp_sync_service.dart';
 import '../../core/utils/database_helper.dart';
 import '../../models/mr_model/mr_patient_model.dart';
 import '../../models/prescription_model/prescription_model.dart';
-import '../../models/vitals_model/vitals_model.dart';
 
 class PrescriptionProvider extends ChangeNotifier {
   final PrescriptionApiService _apiService = PrescriptionApiService();
@@ -43,6 +43,7 @@ class PrescriptionProvider extends ChangeNotifier {
   String _xraySearch = '';
   String _ultrasoundSearch = '';
   String _ctSearch = '';
+  String? _mrSearchValue;
 
   bool get isLoading => _isLoading;
   bool get isSaving => _isSaving;
@@ -63,6 +64,7 @@ class PrescriptionProvider extends ChangeNotifier {
   String get xraySearch => _xraySearch;
   String get ultrasoundSearch => _ultrasoundSearch;
   String get ctSearch => _ctSearch;
+  String? get mrSearchValue => _mrSearchValue;
 
   bool get isAdmissionReferral => noteControllers['referTo']!.text.trim().toLowerCase().contains('admission');
 
@@ -94,6 +96,7 @@ class PrescriptionProvider extends ChangeNotifier {
     'weight': TextEditingController(),
     'height': TextEditingController(),
     'blood': TextEditingController(),
+    'receiptId': TextEditingController(),
   };
 
   final Map<String, TextEditingController> noteControllers = {
@@ -199,11 +202,12 @@ class PrescriptionProvider extends ChangeNotifier {
       merged.addAll(localVisits
           .where((v) => v['sync_status'] == 'pending')
           .map((v) => {
-                'patient_mr_number': v['patient_uuid'],
+                'patient_mr_number': (v['mr_number'] ?? v['patient_uuid'])?.toString(),
                 'patient_name': v['patient_name'],
                 'receipt_id': v['receipt_id'],
                 'service_detail': v['opd_service'],
                 'date': v['date'],
+                'sync_status': 'pending',
                 'status': 'Pending Sync',
               }));
 
@@ -230,24 +234,44 @@ class PrescriptionProvider extends ChangeNotifier {
   }
 
   Future<void> loadEyeSetupItems() async {
-    final res = await _apiService.fetchEyeSetupItems('');
-    if (res['success'] == true) {
-      final items = res['data'] as List? ?? [];
-      eyeSetupComplaints.clear();
-      eyeSetupExaminations.clear();
-      eyeSetupDiagnosis.clear();
-      eyeSetupAdvised.clear();
-      eyeSetupSurgery.clear();
-      for (var item in items) {
-        final type = (item['item_type'] ?? '').toString().trim();
-        final name = item['item_name'] ?? '';
-        if (type == 'Complaint') eyeSetupComplaints.add(name);
-        else if (type == 'Examination') eyeSetupExaminations.add(name);
-        else if (type == 'Diagnosis') eyeSetupDiagnosis.add(name);
-        else if (type == 'Advised') eyeSetupAdvised.add(name);
-        else if (type == 'Surgery') eyeSetupSurgery.add(name);
+    bool found = false;
+    if (_connectivity.isOnline.value) {
+      try {
+        final res = await _apiService.fetchEyeSetupItems('')
+            .timeout(const Duration(seconds: 8));
+        if (res['success'] == true) {
+          final items = res['data'] as List? ?? [];
+          _processEyeSetup(items);
+          found = true;
+        }
+      } catch (e) {
+        debugPrint('⚠️ Online eye setup failed: $e');
       }
     }
+
+    if (!found) {
+      debugPrint('📴 Loading eye setup from local DB');
+      final localItems = await _db.queryAll('master_eye_setup');
+      _processEyeSetup(localItems);
+    }
+  }
+
+  void _processEyeSetup(List<dynamic> items) {
+    eyeSetupComplaints.clear();
+    eyeSetupExaminations.clear();
+    eyeSetupDiagnosis.clear();
+    eyeSetupAdvised.clear();
+    eyeSetupSurgery.clear();
+    for (var item in items) {
+      final type = (item['item_type'] ?? '').toString().trim();
+      final name = item['item_name'] ?? '';
+      if (type == 'Complaint') eyeSetupComplaints.add(name);
+      else if (type == 'Examination') eyeSetupExaminations.add(name);
+      else if (type == 'Diagnosis') eyeSetupDiagnosis.add(name);
+      else if (type == 'Advised') eyeSetupAdvised.add(name);
+      else if (type == 'Surgery') eyeSetupSurgery.add(name);
+    }
+    notifyListeners();
   }
 
   Future<void> selectConsultationPatient(dynamic patient, {String? department}) async {
@@ -313,6 +337,7 @@ class PrescriptionProvider extends ChangeNotifier {
     _errorMessage = null;
     _currentPatient = null;
     _currentVitals = null;
+    _mrSearchValue = mrNumber; // Keep the search value for UI
     for (var c in vitalControllers.values) c.clear();
     for (var c in noteControllers.values) c.clear();
     notifyListeners();
@@ -325,6 +350,7 @@ class PrescriptionProvider extends ChangeNotifier {
         final result = await _mrApiService.fetchPatientByMR(mr);
         if (result.success && result.patient != null) {
           _currentPatient = result.patient!.toPatientModel();
+          _mrSearchValue = null; // Clear search value if patient found
           foundOnline = true;
           // Notify early so patient info shows up while other details fetch
           notifyListeners();
@@ -350,7 +376,13 @@ class PrescriptionProvider extends ChangeNotifier {
 
         if (localRows.isNotEmpty) {
           _currentPatient = PatientModel.fromLocalMap(localRows.first);
+          _mrSearchValue = null;
           debugPrint('✅ Found patient locally: ${_currentPatient?.fullName}');
+          
+          // Also load other data offline
+          await fetchDiagnosis(department ?? 'General');
+          await loadTests();
+          await fetchVitals(mr, receiptId: _receiptId);
         } else {
           // Try numeric match as last resort
           final numericInput = mr.replaceAll(RegExp(r'[^0-9]'), '');
@@ -363,7 +395,11 @@ class PrescriptionProvider extends ChangeNotifier {
              }, orElse: () => {});
              if (match.isNotEmpty) {
                _currentPatient = PatientModel.fromLocalMap(match);
+               _mrSearchValue = null;
                debugPrint('✅ Found patient locally via numeric match: ${_currentPatient?.fullName}');
+               await fetchDiagnosis(department ?? 'General');
+               await loadTests();
+               await fetchVitals(_currentPatient?.mrNumber ?? mr, receiptId: _receiptId);
              }
           }
         }
@@ -385,20 +421,70 @@ class PrescriptionProvider extends ChangeNotifier {
     _currentVitals = null;
     notifyListeners();
     try {
-      Map<String, dynamic> res = {'success': false};
+      if (_connectivity.isOnline.value) {
+        Map<String, dynamic> res = {'success': false};
 
-      // 1. Try fetching by Receipt ID first if available
-      if (receiptId != null && receiptId.isNotEmpty) {
-        res = await _vitalsApiService.getVitalsByReceipt(receiptId);
-      }
+        // 1. Try fetching by Receipt ID first if available
+        if (receiptId != null && receiptId.isNotEmpty) {
+          res = await _vitalsApiService.getVitalsByReceipt(receiptId);
+        }
 
-      // 2. Fallback to MR Number if Receipt fetch failed or returned no data
-      if (res['success'] != true || res['data'] == null) {
-        res = await _vitalsApiService.getVitalsByMR(mrNumber);
-      }
-      
-      if (res['success'] == true && res['data'] != null) {
-        _currentVitals = VitalsModel.fromJson(res['data']);
+        // 2. Fallback to MR Number if Receipt fetch failed or returned no data
+        if (res['success'] != true || res['data'] == null) {
+          res = await _vitalsApiService.getVitalsByMR(mrNumber);
+        }
+
+        if (res['success'] == true && res['data'] != null) {
+          _currentVitals = VitalsModel.fromJson(res['data']);
+        }
+      } else {
+        final db = await _db.database;
+        Map<String, dynamic>? vitalsRow;
+
+        if (receiptId != null && receiptId.isNotEmpty) {
+          final visits = await db.query(
+            'visits_local',
+            where: 'receipt_id = ?',
+            whereArgs: [receiptId],
+            orderBy: 'created_at DESC',
+            limit: 1,
+          );
+          if (visits.isNotEmpty) {
+            final visitUuid = visits.first['device_uuid']?.toString();
+            if (visitUuid != null && visitUuid.isNotEmpty) {
+              final rows = await db.query(
+                'vitals_local',
+                where: 'visit_uuid = ?',
+                whereArgs: [visitUuid],
+                orderBy: 'created_at DESC',
+                limit: 1,
+              );
+              if (rows.isNotEmpty) {
+                vitalsRow = rows.first;
+              }
+            }
+          }
+        }
+
+        if (vitalsRow == null) {
+          final rows = await db.query(
+            'vitals_local',
+            where: 'mr_number = ?',
+            whereArgs: [mrNumber],
+            orderBy: 'created_at DESC',
+            limit: 1,
+          );
+          if (rows.isNotEmpty) {
+            vitalsRow = rows.first;
+          }
+        }
+
+        if (vitalsRow != null) {
+          final normalized = Map<String, dynamic>.from(vitalsRow);
+          normalized['temperature'] = normalized['temperature'] ?? normalized['temp'];
+          normalized['receipt_id'] = receiptId;
+          _currentVitals = VitalsModel.fromJson(normalized);
+        }
       }
     } catch (e) {
       debugPrint('Error fetching vitals: $e');
@@ -428,36 +514,164 @@ class PrescriptionProvider extends ChangeNotifier {
     _isLoadingTests = true;
     notifyListeners();
     
-    try {
-      final labRes = await _apiService.fetchLabTests();
-      if (labRes['success'] == true) _labTests = labRes['data'] ?? [];
+    bool foundLab = false;
+    bool foundRad = false;
 
-      final radRes = await _apiService.fetchRadiologyTests();
-      if (radRes['success'] == true) _radiologyTests = radRes['data'] ?? [];
-    } catch (e) {
-      debugPrint('Error loading tests: $e');
-    } finally {
-      _isLoadingTests = false;
-      notifyListeners();
+    if (_connectivity.isOnline.value) {
+      try {
+        final labRes = await _apiService.fetchLabTests()
+            .timeout(const Duration(seconds: 8));
+        if (labRes['success'] == true) {
+          _labTests = labRes['data'] ?? [];
+          foundLab = true;
+        }
+
+        final radRes = await _apiService.fetchRadiologyTests()
+            .timeout(const Duration(seconds: 8));
+        if (radRes['success'] == true) {
+          _radiologyTests = radRes['data'] ?? [];
+          foundRad = true;
+        }
+      } catch (e) {
+        debugPrint('⚠️ Online tests load failed: $e');
+      }
     }
+
+    if (!foundLab || !foundRad) {
+      debugPrint('📴 Loading tests from local DB');
+      final localTests = await _db.queryAll('master_investigations');
+      if (!foundLab) {
+        _labTests = localTests.where((t) {
+          final type = (t['test_type'] ?? t['test_category'] ?? '').toString().toLowerCase();
+          return type == 'lab';
+        }).toList();
+      }
+      if (!foundRad) {
+        _radiologyTests = localTests.where((t) {
+          final type = (t['test_type'] ?? t['test_category'] ?? '').toString().toLowerCase();
+          return type != 'lab' && type.isNotEmpty;
+        }).toList();
+      }
+      // If still empty, split by type
+      if (_labTests.isEmpty && _radiologyTests.isEmpty && localTests.isNotEmpty) {
+        debugPrint('📴 Splitting all ${localTests.length} tests as lab');
+        _labTests = localTests;
+      }
+    }
+
+    _isLoadingTests = false;
+    notifyListeners();
   }
 
   Future<Map<String, dynamic>> searchMedicines(String query) async {
     return await _apiService.searchMedicines(query);
   }
 
-  Future<void> fetchDiagnosis(String department) async {
+  // Cache online diagnosis questions to local DB for offline use
+  void _cacheDiagnosisToDb(List<dynamic> questions, String department) async {
     try {
-      final res = await _apiService.fetchDiagnosisQuestions(department);
-      if (res['success'] == true) {
-        _diagnosisQuestions = res['data'] ?? [];
-        _diagnosisAnswers = {};
+      final db = await _db.database;
+      // Delete existing entries for this department only
+      await db.delete('master_diagnosis', where: 'LOWER(category) = ?', whereArgs: [department.toLowerCase()]);
+      for (var q in questions) {
+        String optionsJson;
+        try {
+          optionsJson = jsonEncode(q['options'] ?? q['choices'] ?? []);
+        } catch (_) {
+          optionsJson = '[]';
+        }
+        await db.insert('master_diagnosis', {
+          'id': q['id'],
+          'question': q['question_text'] ?? q['question'] ?? '',
+          'options_json': optionsJson,
+          'category': department, // Always use the queried department, not q['category']
+          'question_type': q['question_mode'] ?? q['question_type'] ?? 'choice',
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
+      }
+      debugPrint('💾 Cached ${questions.length} diagnosis questions for $department');
+      if (questions.isNotEmpty) {
+        debugPrint('💾 First cached item: id=${questions.first['id']}, category=$department, mode=${questions.first['question_mode'] ?? questions.first['question_type']}');
       }
     } catch (e) {
-      debugPrint('Error fetching diagnosis: $e');
-    } finally {
-      notifyListeners();
+      debugPrint('⚠️ Failed to cache diagnosis: $e');
     }
+  }
+
+  Future<void> fetchDiagnosis(String department) async {
+    bool found = false;
+    if (_connectivity.isOnline.value) {
+      try {
+        final res = await _apiService.fetchDiagnosisQuestions(department)
+            .timeout(const Duration(seconds: 8));
+        if (res['success'] == true) {
+          _diagnosisQuestions = res['data'] ?? [];
+          _diagnosisAnswers = {};
+          found = true;
+          // Log first item structure for debugging
+          if (_diagnosisQuestions.isNotEmpty) {
+            debugPrint('🌐 Online diagnosis first item: ${_diagnosisQuestions.first}');
+          }
+          // Cache to local DB for offline use
+          _cacheDiagnosisToDb(_diagnosisQuestions, department);
+        }
+      } catch (e) {
+        debugPrint('⚠️ Online diagnosis failed: $e');
+      }
+    }
+
+    if (!found) {
+      debugPrint('📴 Loading diagnosis from local DB for $department');
+      final db = await _db.database;
+
+      // First try: exact department match (cached from online API)
+      List<Map<String, dynamic>> localDiagnosis = await db.query(
+        'master_diagnosis',
+        where: 'LOWER(category) = ?',
+        whereArgs: [department.toLowerCase()],
+      );
+
+      // Second try: for Eye, also try 'eye' variants
+      if (localDiagnosis.isEmpty && department.toLowerCase().contains('eye')) {
+        localDiagnosis = await db.query(
+          'master_diagnosis',
+          where: "LOWER(category) LIKE '%eye%'",
+        );
+      }
+
+      // Only fall back to all questions if we have options data
+      // (bootstrap data has no options so it's useless for rendering)
+      if (localDiagnosis.isEmpty) {
+        debugPrint('📴 No cached diagnosis for $department — need to go online first');
+        _diagnosisQuestions = [];
+        _diagnosisAnswers = {};
+        notifyListeners();
+        return;
+      }
+
+      debugPrint('📴 Diagnosis rows found in DB: ${localDiagnosis.length}');
+      if (localDiagnosis.isNotEmpty) {
+        debugPrint('📴 Offline diagnosis first item raw: ${localDiagnosis.first}');
+      }
+
+      _diagnosisQuestions = localDiagnosis.map((d) {
+        List<dynamic> options = [];
+        try {
+          final decoded = jsonDecode(d['options_json']?.toString() ?? '[]');
+          options = decoded is List ? decoded : [];
+        } catch (_) {
+          options = [];
+        }
+        return {
+          'id': d['id'],
+          'question_text': d['question'],
+          'options': options,
+          'question_type': d['question_type'] ?? d['question_mode'] ?? 'choice',
+          'question_mode': d['question_type'] ?? d['question_mode'] ?? 'choice',
+        };
+      }).toList();
+      _diagnosisAnswers = {};
+    }
+    notifyListeners();
   }
 
   // ─── GP Form Helpers ──────────────────────────────────────────────
@@ -561,84 +775,91 @@ class PrescriptionProvider extends ChangeNotifier {
     _isSaving = true;
     notifyListeners();
 
-    final vitals = {
-      for (var entry in vitalControllers.entries) entry.key: entry.value.text
-    };
+    try {
+      final prescription = PrescriptionModel(
+        mrNumber: _currentPatient?.mrNumber ?? '',
+        doctorName: doctorName,
+        doctorSrlNo: doctorSrlNo,
+        receiptId: _receiptId,
+        vitals: vitalControllers.map((key, controller) => MapEntry(key, controller.text)),
+        historyExamination: isEye ? (presentingComplaintsCtrl.text.isEmpty ? null : presentingComplaintsCtrl.text) : (noteControllers['history']?.text.isEmpty ?? true ? null : noteControllers['history']!.text),
+        treatment: isEye ? (_eyeTreatmentType.isEmpty ? null : _eyeTreatmentType) : (noteControllers['treatment']?.text.isEmpty ?? true ? null : noteControllers['treatment']!.text),
+        remarks: isEye ? (eyeRemarksCtrl.text.isEmpty ? null : eyeRemarksCtrl.text) : (noteControllers['remarks']?.text.isEmpty ?? true ? null : noteControllers['remarks']!.text),
+        consultantNotes: noteControllers['notes']?.text.isEmpty ?? true ? null : noteControllers['notes']!.text,
+        referTo: noteControllers['referTo']?.text.isEmpty ?? true ? null : noteControllers['referTo']!.text,
+        medicines: _prescribedMedicines,
+        investigations: _selectedInvestigations,
+        instructions: _instructions,
+        diagnosis: _diagnosisAnswers.entries.map((e) {
+          final question = _diagnosisQuestions.cast<Map?>().firstWhere(
+            (q) => q?['id'] == e.key,
+            orElse: () => const {},
+          );
+          return PrescriptionDiagnosis(
+            questionId: e.key,
+            questionText: (question?['question_text'] ?? question?['question'] ?? '').toString(),
+            answerText: e.value is String ? e.value : null,
+            answerValue: e.value,
+          );
+        }).toList(),
+        eyeDetails: isEye ? _buildEyeDetails() : null,
+      );
 
-    final prescription = PrescriptionModel(
-      mrNumber: _currentPatient?.mrNumber ?? '',
-      doctorName: doctorName,
-      doctorSrlNo: doctorSrlNo,
-      receiptId: _receiptId,
-      vitals: vitalControllers.map((key, controller) => MapEntry(key, controller.text)),
-      historyExamination: isEye ? (presentingComplaintsCtrl.text.isEmpty ? null : presentingComplaintsCtrl.text) : (noteControllers['history']?.text.isEmpty ?? true ? null : noteControllers['history']!.text),
-      treatment: isEye ? (_eyeTreatmentType.isEmpty ? null : _eyeTreatmentType) : (noteControllers['treatment']?.text.isEmpty ?? true ? null : noteControllers['treatment']!.text),
-      remarks: isEye ? (eyeRemarksCtrl.text.isEmpty ? null : eyeRemarksCtrl.text) : (noteControllers['remarks']?.text.isEmpty ?? true ? null : noteControllers['remarks']!.text),
-      consultantNotes: noteControllers['notes']?.text.isEmpty ?? true ? null : noteControllers['notes']!.text,
-      referTo: noteControllers['referTo']?.text.isEmpty ?? true ? null : noteControllers['referTo']!.text,
-      medicines: _prescribedMedicines,
-      investigations: _selectedInvestigations,
-      instructions: _instructions,
-      diagnosis: _diagnosisAnswers.entries.map((e) => PrescriptionDiagnosis(
-        questionId: e.key,
-        questionText: '', 
-        answerText: e.value is String ? e.value : null,
-        answerValue: e.value,
-      )).toList(),
-      eyeDetails: isEye ? _buildEyeDetails() : null,
-    );
+      bool isSuccess = false;
+      if (_connectivity.isOnline.value) {
+        final res = await _apiService.savePrescription(prescription.toJson());
+        isSuccess = res['success'] == true ||
+            res['status'] == true ||
+            res['ok'] == true ||
+            (res['message']?.toString().toLowerCase().contains('saved') ?? false);
+      } else {
+        debugPrint('📴 App is OFFLINE. Saving prescription locally.');
+        final visitUuid = _syncService.generateUuid();
+        final bpParts = (vitalControllers['bp']?.text ?? '').split('/');
 
-    bool isSuccess = false;
-    if (_connectivity.isOnline.value) {
-      final res = await _apiService.savePrescription(prescription.toJson());
-      isSuccess = res['success'] == true || res['status'] == true;
-    } else {
-      debugPrint('📴 App is OFFLINE. Saving prescription locally.');
-      
-      final visitUuid = _syncService.generateUuid();
-      
-      // 1. Save Vitals
-      await _db.insert('vitals_local', {
-        'device_uuid': _syncService.generateUuid(),
-        'patient_uuid': _currentPatient!.deviceUuid ?? _currentPatient!.mrNumber,
-        'mr_number': _currentPatient!.mrNumber == 'PENDING' ? null : _currentPatient!.mrNumber,
-        'visit_uuid': visitUuid,
-        'bsr': double.tryParse(vitalControllers['blood']?.text ?? '0') ?? 0.0,
-        'systolic': double.tryParse(vitalControllers['bp']?.text.split('/')[0] ?? '0') ?? 0.0,
-        'diastolic': double.tryParse(vitalControllers['bp']?.text.split('/').last ?? '0') ?? 0.0,
-        'pulse': double.tryParse(vitalControllers['pulse']?.text ?? '0') ?? 0.0,
-        'weight': double.tryParse(vitalControllers['weight']?.text ?? '0') ?? 0.0,
-        'temp': double.tryParse(vitalControllers['temp']?.text ?? '0') ?? 0.0,
-        'sync_status': 'pending',
-        'created_at': DateTime.now().toIso8601String(),
-      });
+        await _db.insert('vitals_local', {
+          'device_uuid': _syncService.generateUuid(),
+          'patient_uuid': _currentPatient!.deviceUuid ?? _currentPatient!.mrNumber,
+          'mr_number': _currentPatient!.mrNumber == 'PENDING' ? null : _currentPatient!.mrNumber,
+          'visit_uuid': visitUuid,
+          'bsr': double.tryParse(vitalControllers['blood']?.text ?? '0') ?? 0.0,
+          'systolic': double.tryParse(bpParts.isNotEmpty ? bpParts.first : '0') ?? 0.0,
+          'diastolic': double.tryParse(bpParts.length > 1 ? bpParts.last : '0') ?? 0.0,
+          'pulse': double.tryParse(vitalControllers['pulse']?.text ?? '0') ?? 0.0,
+          'weight': double.tryParse(vitalControllers['weight']?.text ?? '0') ?? 0.0,
+          'temp': double.tryParse(vitalControllers['temp']?.text ?? '0') ?? 0.0,
+          'sync_status': 'pending',
+          'created_at': DateTime.now().toIso8601String(),
+        });
 
-      // 2. Save Prescription
-      await _db.insert('prescriptions_local', {
-        'device_uuid': _syncService.generateUuid(),
-        'patient_uuid': _currentPatient!.deviceUuid ?? _currentPatient!.mrNumber,
-        'mr_number': _currentPatient!.mrNumber == 'PENDING' ? null : _currentPatient!.mrNumber,
-        'visit_uuid': visitUuid,
-        'doctor_srl_no': doctorSrlNo,
-        'treatment': prescription.treatment,
-        'medicines_json': jsonEncode(prescription.medicines),
-        'investigations_json': jsonEncode(prescription.investigations),
-        'sync_status': 'pending',
-        'created_at': DateTime.now().toIso8601String(),
-      });
+        await _db.insert('prescriptions_local', {
+          'device_uuid': _syncService.generateUuid(),
+          'patient_uuid': _currentPatient!.deviceUuid ?? _currentPatient!.mrNumber,
+          'mr_number': _currentPatient!.mrNumber == 'PENDING' ? null : _currentPatient!.mrNumber,
+          'visit_uuid': visitUuid,
+          'doctor_srl_no': doctorSrlNo,
+          'treatment': prescription.treatment,
+          'medicines_json': jsonEncode(prescription.medicines.map((m) => m.toJson()).toList()),
+          'investigations_json': jsonEncode(prescription.investigations.map((i) => i.toJson()).toList()),
+          'sync_status': 'pending',
+          'created_at': DateTime.now().toIso8601String(),
+        });
 
-      isSuccess = true;
+        isSuccess = true;
+      }
+
+      if (isSuccess) {
+        _lastSavedPrescription = prescription;
+        clearForm();
+      }
+      return isSuccess;
+    } catch (e) {
+      debugPrint('❌ savePrescription failed: $e');
+      return false;
+    } finally {
+      _isSaving = false;
+      notifyListeners();
     }
-    
-    _isSaving = false;
-    
-    if (isSuccess) {
-      _lastSavedPrescription = prescription;
-      clearForm();
-    }
-    
-    notifyListeners();
-    return isSuccess;
   }
 
   void updateSurgerySearch(String query) {
@@ -710,6 +931,7 @@ class PrescriptionProvider extends ChangeNotifier {
     _medMode = 'medicine';
     _medicineSearchResults = [];
     _medSearchQuery = '';
+    _mrSearchValue = null;
     _eyeComplaints = [];
     _eyeExaminations = [];
     _eyeDiagnosis = [];
@@ -724,8 +946,9 @@ class PrescriptionProvider extends ChangeNotifier {
     }
     for (var side in visionCtrls.values) {
       for (var ctrl in side.values) ctrl.clear();
+    }
     notifyListeners();
-  }}
+  }
 
   String _normalizeMrNumber(String input) {
     String trimmed = input.trim();
@@ -734,5 +957,27 @@ class PrescriptionProvider extends ChangeNotifier {
       return trimmed.padLeft(5, '0');
     }
     return trimmed;
+  }
+
+  Future<String?> getMrPrefix() async {
+    try {
+      final db = await _db.database;
+      final config = await db.query('camp_config', limit: 1);
+      if (config.isNotEmpty) {
+        return config.first['mr_prefix']?.toString();
+      }
+    } catch (e) {
+      debugPrint('Error getting MR prefix: $e');
+    }
+    return null;
+  }
+
+  Future<void> prefillMrPrefix() async {
+    if (_currentPatient != null) return;
+    final prefix = await getMrPrefix();
+    if (prefix != null && prefix.isNotEmpty) {
+      _mrSearchValue = '$prefix-';
+      notifyListeners();
+    }
   }
 }

@@ -103,14 +103,83 @@ class CampSyncService {
             }
           }
 
-          if (payload['diagnosisQuestions'] != null) {
+          // Support both 'diagnosisQuestions' and 'diagnosis_catalog' key names
+          final diagnosisRaw = payload['diagnosisQuestions'] ?? payload['diagnosis_catalog'];
+          if (diagnosisRaw != null) {
             await _db.clearTable('master_diagnosis');
-            for (var dq in payload['diagnosisQuestions']) {
+            
+            // diagnosis_catalog can be a Map<category, List<questions>> or a flat List
+            List<dynamic> diagList = [];
+            if (diagnosisRaw is List) {
+              diagList = diagnosisRaw;
+            } else if (diagnosisRaw is Map) {
+              // Map format: { "General": [...], "Eye": [...] }
+              diagnosisRaw.forEach((category, questions) {
+                if (questions is List) {
+                  for (var q in questions) {
+                    if (q is Map) {
+                      diagList.add({...q, 'category': q['category'] ?? category});
+                    }
+                  }
+                }
+              });
+            }
+
+            debugPrint('💊 Saving ${diagList.length} diagnosis questions');
+            if (diagList.isNotEmpty) {
+              debugPrint('💊 First diagnosis item keys: ${diagList.first.keys.toList()}');
+              debugPrint('💊 First diagnosis item full: ${diagList.first}');
+            }
+
+            for (var dq in diagList) {
+              final questionText = dq['question_text'] ?? dq['question'] ?? dq['title'] ?? '';
+              final rawOptions = dq['options'] ?? dq['choices'] ?? [];
+              final category = dq['category'] ?? 'General';
+              // API uses 'question_mode', fallback to 'question_type'
+              final questionType = dq['question_mode'] ?? dq['question_type'] ?? dq['type'] ?? 'choice';
+              String optionsJson;
+              try {
+                optionsJson = jsonEncode(rawOptions is List ? rawOptions : []);
+              } catch (_) {
+                optionsJson = '[]';
+              }
               await _db.insert('master_diagnosis', {
                 'id': dq['id'],
-                'question': dq['question_text'],
-                'options_json': jsonEncode(dq['options']),
-                'category': dq['category'] ?? 'General',
+                'question': questionText,
+                'options_json': optionsJson,
+                'category': category,
+                'question_type': questionType,
+              });
+            }
+          } else {
+            debugPrint('⚠️ Bootstrap: diagnosisQuestions key missing from payload. Keys: ${payload.keys.toList()}');
+          }
+
+          if (payload['investigations'] != null) {
+            await _db.clearTable('master_investigations');
+            final invList = payload['investigations'] as List;
+            debugPrint('🔬 Saving ${invList.length} investigations');
+            if (invList.isNotEmpty) {
+              debugPrint('🔬 First investigation keys: ${invList.first.keys.toList()}, sample: ${invList.first}');
+            }
+            for (var inv in invList) {
+              await _db.insert('master_investigations', {
+                'srl_no': inv['srl_no'] ?? inv['id'],
+                'test_id': inv['test_id']?.toString() ?? inv['id']?.toString(),
+                'test_name': inv['test_name'],
+                'test_category': inv['test_category'] ?? inv['investigation_type'],
+                'test_type': inv['test_type'] ?? inv['investigation_type'],
+              });
+            }
+          }
+
+          if (payload['eyeSetup'] != null) {
+            await _db.clearTable('master_eye_setup');
+            for (var item in payload['eyeSetup']) {
+              await _db.insert('master_eye_setup', {
+                'id': item['id'],
+                'item_name': item['item_name'],
+                'item_type': item['item_type'],
               });
             }
           }
@@ -122,6 +191,9 @@ class CampSyncService {
             'mr_sequence': payload['camp']['mr_sequence'] ?? 0,
             'last_bootstrap_at': DateTime.now().toIso8601String(),
           });
+
+          // Fetch and cache full diagnosis questions (with options) from live API
+          await _fetchAndCacheDiagnosisQuestions(headers, ['General', 'Eye']);
 
           return {'success': true, 'message': 'Master data updated successfully'};
         }
@@ -135,6 +207,47 @@ class CampSyncService {
       return {'success': false, 'message': 'Failed to fetch master data: ${response.statusCode}'};
     } catch (e) {
       return {'success': false, 'message': 'Bootstrap error: $e'};
+    }
+  }
+
+  // ─── Fetch & Cache Diagnosis Questions ───────────────────────────
+  Future<void> _fetchAndCacheDiagnosisQuestions(Map<String, String> headers, List<String> departments) async {
+    for (final dept in departments) {
+      try {
+        final url = '${GlobalApi.baseUrl}/diagnosis/questions/department/${Uri.encodeComponent(dept)}';
+        final res = await http.get(Uri.parse(url), headers: headers)
+            .timeout(const Duration(seconds: 10));
+        if (res.statusCode == 200) {
+          final data = jsonDecode(res.body);
+          if (data['success'] == true) {
+            final questions = data['data'] as List? ?? [];
+            if (questions.isNotEmpty) {
+              // Delete old cached entries for this department
+              final db = await _db.database;
+              await db.delete('master_diagnosis',
+                  where: 'LOWER(category) = ?', whereArgs: [dept.toLowerCase()]);
+              for (var q in questions) {
+                String optionsJson;
+                try {
+                  optionsJson = jsonEncode(q['options'] ?? q['choices'] ?? []);
+                } catch (_) {
+                  optionsJson = '[]';
+                }
+                await _db.insert('master_diagnosis', {
+                  'id': q['id'],
+                  'question': q['question_text'] ?? q['question'] ?? '',
+                  'options_json': optionsJson,
+                  'category': dept, // Store with the department name we queried
+                  'question_type': q['question_mode'] ?? q['question_type'] ?? 'choice',
+                });
+              }
+              debugPrint('💾 Bootstrap cached ${questions.length} diagnosis questions for $dept');
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('⚠️ Failed to cache diagnosis for $dept: $e');
+      }
     }
   }
 

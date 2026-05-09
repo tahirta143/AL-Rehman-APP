@@ -21,7 +21,7 @@ class DatabaseHelper {
     String path = join(await getDatabasesPath(), 'hims_offline.db');
     return await openDatabase(
       path,
-      version: 13,
+      version: 17,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -193,6 +193,56 @@ class DatabaseHelper {
         await db.execute('ALTER TABLE vitals_local ADD COLUMN bp_reading_type TEXT DEFAULT "regular"');
       } catch (e) {}
     }
+
+    if (oldVersion < 15) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS master_investigations (
+          srl_no INTEGER PRIMARY KEY,
+          test_id TEXT,
+          test_name TEXT,
+          test_category TEXT,
+          test_type TEXT
+        )
+      ''');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS master_eye_setup (
+          id INTEGER PRIMARY KEY,
+          item_name TEXT,
+          item_type TEXT
+        )
+      ''');
+    }
+
+    if (oldVersion < 16) {
+      // Ensure these tables exist on devices that missed the v15 migration
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS master_investigations (
+          srl_no INTEGER PRIMARY KEY,
+          test_id TEXT,
+          test_name TEXT,
+          test_category TEXT,
+          test_type TEXT
+        )
+      ''');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS master_eye_setup (
+          id INTEGER PRIMARY KEY,
+          item_name TEXT,
+          item_type TEXT
+        )
+      ''');
+      // Add question_type column to master_diagnosis if missing
+      try {
+        await db.execute('ALTER TABLE master_diagnosis ADD COLUMN question_type TEXT DEFAULT "choice"');
+      } catch (e) {}
+    }
+
+    if (oldVersion < 17) {
+      // Add question_type column to master_diagnosis if missing
+      try {
+        await db.execute('ALTER TABLE master_diagnosis ADD COLUMN question_type TEXT DEFAULT "choice"');
+      } catch (e) {}
+    }
   }
 
   Future _onCreate(Database db, int version) async {
@@ -255,7 +305,26 @@ class DatabaseHelper {
         id INTEGER PRIMARY KEY,
         question TEXT,
         options_json TEXT,
-        category TEXT
+        category TEXT,
+        question_type TEXT
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE master_investigations (
+        srl_no INTEGER PRIMARY KEY,
+        test_id TEXT,
+        test_name TEXT,
+        test_category TEXT,
+        test_type TEXT
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE master_eye_setup (
+        id INTEGER PRIMARY KEY,
+        item_name TEXT,
+        item_type TEXT
       )
     ''');
 
@@ -433,6 +502,12 @@ class DatabaseHelper {
 
   Future<void> clearTable(String table) async {
     Database db = await database;
-    await db.delete(table);
+    final result = await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+      [table],
+    );
+    if (result.isNotEmpty) {
+      await db.delete(table);
+    }
   }
 }

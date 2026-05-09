@@ -6,12 +6,12 @@ import '../../models/prescription_model/prescription_model.dart';
 import '../../models/vitals_model/vitals_model.dart';
 import '../../providers/prescription_provider/prescription_provider.dart';
 import '../../core/providers/permission_provider.dart';
-import '../../core/utils/date_formatter.dart';
 import '../../custum widgets/custom_loader.dart';
 import '../../custum widgets/animations/animations.dart';
 import 'package:animate_do/animate_do.dart';
 import 'widgets/lab_values_sheet.dart';
 import '../../core/utils/wait_time_helper.dart';
+import '../../core/services/pdf_eye_prescription_service.dart';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const kTeal = Color(0xFF00B5AD);
@@ -43,6 +43,7 @@ class _PrescriptionScreenState extends State<PrescriptionScreen>
         final provider = context.read<PrescriptionProvider>();
         provider.clearForm();
         provider.loadConsultationPatients();
+        provider.prefillMrPrefix();
       }
     });
   }
@@ -463,10 +464,17 @@ class _SavePrintButton extends StatelessWidget {
       height: isTablet ? 52 : 48,
       child: ElevatedButton.icon(
         onPressed: provider.currentPatient == null ? null : () async {
+          final patient = provider.currentPatient;
           final success = await provider.savePrescription(
             doctorName: perm.fullName ?? 'Doctor',
             doctorSrlNo: 1, // Defaulting for now
           );
+          if (success && patient != null) {
+            final rx = provider.lastSavedPrescription;
+            if (rx != null) {
+              await PDFEyePrescriptionService.printPrescription(rx, patient);
+            }
+          }
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -604,7 +612,7 @@ class _PatientInfoCard extends StatelessWidget {
     return Column(
       children: [
         _FieldRow(fields: [
-          _FieldData('MR No.*', 'Enter MR no.', required: true, initialValue: patient?.mrNumber, onSearch: (val) => provider.searchPatient(val)),
+          _FieldData('MR No.*', 'Enter MR no.', required: true, initialValue: patient?.mrNumber ?? provider.mrSearchValue, onSearch: (val) => provider.searchPatient(val)),
           _FieldData('Patient Name', '', initialValue: patient?.fullName, readOnly: true),
         ]),
         const SizedBox(height: 10),
@@ -633,7 +641,7 @@ class _PatientInfoCard extends StatelessWidget {
     return Column(
       children: [
         Row(children: [
-          Expanded(child: _InputField(label: 'MR No.*', hint: 'Enter MR no.', required: true, initialValue: patient?.mrNumber, onSubmitted: (val) => provider.searchPatient(val))),
+          Expanded(child: _InputField(label: 'MR No.*', hint: 'Enter MR no.', required: true, initialValue: patient?.mrNumber ?? provider.mrSearchValue, onSubmitted: (val) => provider.searchPatient(val))),
           const SizedBox(width: 12),
           Expanded(child: _InputField(label: 'Patient Name', hint: '', initialValue: patient?.fullName, readOnly: true)),
           const SizedBox(width: 12),
@@ -1219,28 +1227,32 @@ class _InvestigationsTabState extends State<_InvestigationsTab> {
     final labTests = widget.provider.labTests.where((t) => 
       t['test_name'].toString().toLowerCase().contains(widget.provider.labSearch.toLowerCase())).toList();
     
-    // Support variants like X-Ray, Xray, X Ray
+    // test_category holds the investigation_type from API (x-ray, ultrasound, ct-scan, radiology, etc.)
     final xrayTests = widget.provider.radiologyTests.where((t) {
-      final cat = t['test_category']?.toString().toLowerCase() ?? '';
-      final matchesCat = cat.contains('x-ray') || cat.contains('xray') || cat.contains('x ray');
+      final cat = (t['test_category'] ?? t['test_type'] ?? '').toString().toLowerCase();
+      final matchesCat = cat.contains('x-ray') || cat.contains('xray') || cat.contains('x ray') || cat.contains('x_ray');
       final matchesSearch = t['test_name'].toString().toLowerCase().contains(widget.provider.xraySearch.toLowerCase());
       return matchesCat && matchesSearch;
     }).toList();
 
-    // Support variants like Ultrasound, Ultra Sound
     final usTests = widget.provider.radiologyTests.where((t) {
-      final cat = t['test_category']?.toString().toLowerCase() ?? '';
-      final matchesCat = cat.contains('ultrasound') || cat.contains('ultra sound');
+      final cat = (t['test_category'] ?? t['test_type'] ?? '').toString().toLowerCase();
+      final matchesCat = cat.contains('ultrasound') || cat.contains('ultra sound') || cat.contains('ultra_sound');
       final matchesSearch = t['test_name'].toString().toLowerCase().contains(widget.provider.ultrasoundSearch.toLowerCase());
       return matchesCat && matchesSearch;
     }).toList();
 
-    // Support variants like CT-Scan, CT Scan, CTScan
     final ctTests = widget.provider.radiologyTests.where((t) {
-      final cat = t['test_category']?.toString().toLowerCase() ?? '';
-      final matchesCat = cat.contains('ct-scan') || cat.contains('ct scan') || cat.contains('ctscan');
+      final cat = (t['test_category'] ?? t['test_type'] ?? '').toString().toLowerCase();
+      final matchesCat = cat.contains('ct-scan') || cat.contains('ct scan') || cat.contains('ctscan') || cat.contains('ct_scan');
       final matchesSearch = t['test_name'].toString().toLowerCase().contains(widget.provider.ctSearch.toLowerCase());
       return matchesCat && matchesSearch;
+    }).toList();
+
+    // Any radiology tests not matched by specific categories
+    final matchedIds = {...xrayTests, ...usTests, ...ctTests}.map((t) => t['srl_no'] ?? t['id']).toSet();
+    final otherRadTests = widget.provider.radiologyTests.where((t) {
+      return !matchedIds.contains(t['srl_no'] ?? t['id']);
     }).toList();
 
     return Padding(
@@ -1260,6 +1272,11 @@ class _InvestigationsTabState extends State<_InvestigationsTab> {
           const SizedBox(height: 20),
           _testSection('CT SCAN', ctTests, 'ct_scan', Icons.biotech, Colors.amber,
             widget.provider.ctSearch, widget.provider.updateCtSearch),
+          if (otherRadTests.isNotEmpty) ...[
+            const SizedBox(height: 20),
+            _testSection('RADIOLOGY', otherRadTests, 'radiology', Icons.radio_outlined, Colors.purple,
+              '', (_) {}),
+          ],
         ],
       ),
     );
@@ -2331,7 +2348,8 @@ class _DiagnosisTab extends StatelessWidget {
         children: provider.diagnosisQuestions.map((q) {
           final qId = q['id'];
           final qText = q['question_text'];
-          final qType = q['question_type']; // 'text' or 'choice'
+          // Support both 'question_type' (online) and 'question_mode' (API/offline)
+          final qType = (q['question_mode'] ?? q['question_type'] ?? 'choice').toString().toLowerCase();
           final qOptions = q['options'];
 
           return Padding(
@@ -2344,16 +2362,37 @@ class _DiagnosisTab extends StatelessWidget {
                   style: const TextStyle(fontWeight: FontWeight.w600, color: kTextDark),
                 ),
                 const SizedBox(height: 8),
-                if (qType == 'choice' && qOptions is List)
+                if (qType == 'text')
+                  TextField(
+                    onChanged: (val) => provider.setDiagnosisAnswer(qId, val),
+                    style: const TextStyle(fontSize: 13),
+                    decoration: InputDecoration(
+                      hintText: 'Enter answer...',
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: kBorder),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: kTeal, width: 1.5),
+                      ),
+                      filled: true,
+                      fillColor: kWhite,
+                    ),
+                  )
+                else if (qOptions is List && qOptions.isNotEmpty)
                   Wrap(
                     spacing: 8,
                     children: qOptions.map((opt) {
-                      final isSelected = provider.diagnosisAnswers[qId] == opt;
+                      // opt can be a String or a Map with 'option_text'
+                      final optStr = opt is Map ? (opt['option_text'] ?? opt['label'] ?? opt.toString()) : opt.toString();
+                      final isSelected = provider.diagnosisAnswers[qId] == optStr || provider.diagnosisAnswers[qId] == opt;
                       return ChoiceChip(
-                        label: Text(opt.toString()),
+                        label: Text(optStr),
                         selected: isSelected,
                         onSelected: (val) {
-                          provider.setDiagnosisAnswer(qId, val ? opt : null);
+                          provider.setDiagnosisAnswer(qId, val ? optStr : null);
                         },
                         selectedColor: kTeal.withOpacity(0.2),
                         checkmarkColor: kTeal,

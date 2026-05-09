@@ -40,6 +40,7 @@ class _EyePrescriptionScreenState extends State<EyePrescriptionScreen>
         final provider = context.read<PrescriptionProvider>();
         provider.clearForm();
         provider.loadConsultationPatients();
+        provider.prefillMrPrefix();
       }
     });
   }
@@ -398,7 +399,7 @@ class _EyePatientInfoCard extends StatelessWidget {
                   label: 'MR Number',
                   hint: 'Search MR...',
                   required: true,
-                  initialValue: p?.mrNumber,
+                  initialValue: p?.mrNumber ?? provider.mrSearchValue,
                   onSubmitted: (val) => provider.searchPatient(val, department: 'Eye'),
                 ),
               ),
@@ -663,6 +664,11 @@ class _EyeTabSection extends StatelessWidget {
       readPerms: [Perm.eyeManagementRead, Perm.eyeManagementUpdate, Perm.eyeRecordRead, Perm.eyeRecordUpdate, Perm.prescriptionRead, Perm.prescriptionCreate],
       writePerms: [Perm.eyeManagementUpdate, Perm.eyeRecordUpdate, Perm.prescriptionCreate],
     ),
+    // _EyeTabDef(
+    //   label: 'Investigations',
+    //   readPerms: [Perm.prescriptionRead, Perm.prescriptionCreate],
+    //   writePerms: [Perm.prescriptionCreate],
+    // ),
     _EyeTabDef(
       label: 'Medicines',
       readPerms: [Perm.eyeMedicinesRead, Perm.eyeMedicinesUpdate, Perm.eyeRecordRead, Perm.eyeRecordUpdate, Perm.prescriptionRead, Perm.prescriptionCreate],
@@ -1070,37 +1076,32 @@ class _DiagnosisTab extends StatelessWidget {
             children: [
               Text(q['question_text'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: kTextDark)),
               const SizedBox(height: 10),
-              if (q['question_mode'] == 'text')
-                _InputField(label: 'Answer', hint: 'Type answer...', onSubmitted: (val) => provider.setDiagnosisAnswer(q['id'], val))
-              else if (q['question_mode'] == 'mcq' || q['question_mode'] == 'checkbox')
-                Wrap(
-                  spacing: 12,
-                  children: (q['options'] as List? ?? []).map((opt) {
-                    final isSelected = (provider.diagnosisAnswers[q['id']] is List) 
-                      ? (provider.diagnosisAnswers[q['id']] as List).contains(opt['id'])
-                      : provider.diagnosisAnswers[q['id']] == opt['id'];
-                    
-                    return Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Checkbox(
-                          value: isSelected,
-                          onChanged: (val) {
-                            if (q['question_mode'] == 'mcq') {
-                              provider.setDiagnosisAnswer(q['id'], opt['id']);
-                            } else {
-                              final current = (provider.diagnosisAnswers[q['id']] as List? ?? []).toList();
-                              if (val == true) current.add(opt['id']); else current.remove(opt['id']);
-                              provider.setDiagnosisAnswer(q['id'], current);
-                            }
-                          },
-                          activeColor: kTeal,
-                        ),
-                        Text(opt['option_text'] ?? '', style: const TextStyle(fontSize: 12)),
-                      ],
+              Builder(builder: (context) {
+                final mode = (q['question_mode'] ?? q['question_type'] ?? 'choice').toString().toLowerCase();
+                final opts = q['options'] as List? ?? [];
+                if (mode == 'text') {
+                  return _InputField(label: 'Answer', hint: 'Type answer...', onSubmitted: (val) => provider.setDiagnosisAnswer(q['id'], val));
+                }
+                if (opts.isEmpty) {
+                  return _InputField(label: 'Answer', hint: 'Type answer...', onSubmitted: (val) => provider.setDiagnosisAnswer(q['id'], val));
+                }
+                return Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: opts.map((opt) {
+                    final optStr = opt is Map ? (opt['option_text'] ?? opt['label'] ?? opt.toString()) : opt.toString();
+                    final isSelected = provider.diagnosisAnswers[q['id']] == optStr || provider.diagnosisAnswers[q['id']] == opt;
+                    return ChoiceChip(
+                      label: Text(optStr, style: const TextStyle(fontSize: 12)),
+                      selected: isSelected,
+                      onSelected: (val) => provider.setDiagnosisAnswer(q['id'], val ? optStr : null),
+                      selectedColor: kTeal.withOpacity(0.2),
+                      checkmarkColor: kTeal,
+                      labelStyle: TextStyle(color: isSelected ? kTeal : kTextMid, fontSize: 12),
                     );
                   }).toList(),
-                ),
+                );
+              }),
             ],
           ),
         );
