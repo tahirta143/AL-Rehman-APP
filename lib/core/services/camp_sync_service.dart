@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/cupertino.dart';
 import 'package:http/http.dart' as http;
+import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import '../utils/database_helper.dart';
 import '../../global/global_api.dart';
@@ -21,21 +22,29 @@ class CampSyncService {
   Future<String?> getCampToken() => _storage.getCampToken();
   Future<void> clearCampToken() => _storage.clearCampToken();
 
-  // ─── Helper: build auth headers ───────────────────────────────────
+  // ─── Helper: build auth headers (Staff JWT) ────────────────────────
   Future<Map<String, String>> _authHeaders() async {
     final token = await _storage.getToken();
-    final campToken = await _storage.getCampToken();
     return {
       'Content-Type': 'application/json',
       if (token != null) 'Authorization': 'Bearer $token',
-      if (campToken != null) 'x-camp-device-token': campToken,
     };
   }
+
+  // ─── Helper: build camp device headers (Device Token) ──────────────
+  Future<Map<String, String>> _campHeaders() async {
+    final campToken = await _storage.getCampToken();
+    return {
+      'Content-Type': 'application/json',
+      if (campToken != null) 'Authorization': 'Bearer $campToken',
+    };
+  }
+
 
   // ─── Bootstrap Master Data ───────────────────────────────────────
   Future<Map<String, dynamic>> bootstrap(String campId) async {
     try {
-      final headers = await _authHeaders();
+      final headers = await _campHeaders();
       final url = '${GlobalApi.baseUrl}/camp-sync/bootstrap/$campId';
       debugPrint('🚀 Bootstrapping from: $url');
       
@@ -44,14 +53,15 @@ class CampSyncService {
         headers: headers,
       ).timeout(const Duration(seconds: 30));
 
+
       debugPrint('📥 Bootstrap Response [${response.statusCode}]');
-      if (response.statusCode != 200) {
+      if (response.statusCode != 200 && response.statusCode != 201) {
         debugPrint('📥 Error Body: ${response.body}');
         final err = jsonDecode(response.body);
         return {'success': false, 'message': err['message'] ?? 'Bootstrap failed'};
       }
 
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 || response.statusCode == 201) {
         final data = jsonDecode(response.body);
         if (data['success'] == true) {
           final payload = data['data'];
@@ -108,35 +118,45 @@ class CampSyncService {
           if (diagnosisRaw != null) {
             await _db.clearTable('master_diagnosis');
             
-            // diagnosis_catalog can be a Map<category, List<questions>> or a flat List
             List<dynamic> diagList = [];
             if (diagnosisRaw is List) {
               diagList = diagnosisRaw;
             } else if (diagnosisRaw is Map) {
-              // Map format: { "General": [...], "Eye": [...] }
-              diagnosisRaw.forEach((category, questions) {
-                if (questions is List) {
-                  for (var q in questions) {
-                    if (q is Map) {
-                      diagList.add({...q, 'category': q['category'] ?? category});
+              if (diagnosisRaw.containsKey('questions') && diagnosisRaw.containsKey('options')) {
+                // Backend format: { questions: [...], options: [...] }
+                final List<dynamic> questions = diagnosisRaw['questions'] ?? [];
+                final List<dynamic> options = diagnosisRaw['options'] ?? [];
+                
+                for (var q in questions) {
+                  final qId = q['id'];
+                  final qOptions = options.where((o) => o['question_id'] == qId).map((o) => o['option_text']).toList();
+                  diagList.add({
+                    ...q,
+                    'options': qOptions,
+                    'question_text': q['question_text'] ?? q['question'] ?? '',
+                  });
+                }
+              } else {
+                // Category format: { "General": [...], "Eye": [...] }
+                diagnosisRaw.forEach((category, questions) {
+                  if (questions is List) {
+                    for (var q in questions) {
+                      if (q is Map) {
+                        diagList.add({...q, 'category': q['category'] ?? category});
+                      }
                     }
                   }
-                }
-              });
+                });
+              }
             }
 
             debugPrint('💊 Saving ${diagList.length} diagnosis questions');
-            if (diagList.isNotEmpty) {
-              debugPrint('💊 First diagnosis item keys: ${diagList.first.keys.toList()}');
-              debugPrint('💊 First diagnosis item full: ${diagList.first}');
-            }
-
             for (var dq in diagList) {
               final questionText = dq['question_text'] ?? dq['question'] ?? dq['title'] ?? '';
               final rawOptions = dq['options'] ?? dq['choices'] ?? [];
               final category = dq['category'] ?? 'General';
-              // API uses 'question_mode', fallback to 'question_type'
-              final questionType = dq['question_mode'] ?? dq['question_type'] ?? dq['type'] ?? 'choice';
+              final questionType = dq['question_mode'] ?? dq['question_type'] ?? 'choice';
+              
               String optionsJson;
               try {
                 optionsJson = jsonEncode(rawOptions is List ? rawOptions : []);
@@ -152,7 +172,7 @@ class CampSyncService {
               });
             }
           } else {
-            debugPrint('⚠️ Bootstrap: diagnosisQuestions key missing from payload. Keys: ${payload.keys.toList()}');
+            debugPrint('⚠️ Bootstrap: diagnosis_catalog missing from payload');
           }
 
           if (payload['investigations'] != null) {
@@ -251,64 +271,111 @@ class CampSyncService {
     }
   }
 
-  // ─── Register Device ──────────────────────────────────────────────
+  // ─── Fetch Available Camps ───────────────────────────────────────
+  Future<Map<String, dynamic>> fetchAvailableCamps() async {
+    try {
+      // Health check ping
+      try {
+        final healthUrl = '${GlobalApi.baseUrl}/health';
+        final healthRes = await http.get(Uri.parse(healthUrl)).timeout(const Duration(seconds: 5));
+        debugPrint('🩺 Health Check [$healthUrl]: ${healthRes.statusCode}');
+      } catch (e) {
+        debugPrint('🩺 Health Check Failed: $e');
+      }
+
+      final url = '${GlobalApi.baseUrl}/camp-sync/available-camps';
+      debugPrint('🚀 Fetching camps from: $url');
+      
+      final response = await http.get(
+        Uri.parse(url),
+      ).timeout(const Duration(seconds: 15));
+
+
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+      debugPrint('📥 Camps Error Body: ${response.body}');
+      return {'success': false, 'message': 'Failed to fetch camps: ${response.statusCode}'};
+
+    } catch (e) {
+      return {'success': false, 'message': 'Fetch camps error: $e'};
+    }
+  }
+
+  // ─── Select Camp With Password ────────────────────────────────────
+  Future<Map<String, dynamic>> selectCamp({
+    required String campId,
+    required String password,
+    required String deviceName,
+    required String deviceIdentifier,
+  }) async {
+    try {
+      final url = '${GlobalApi.baseUrl}/camp-sync/select-camp';
+      final body = {
+        'camp_id': campId,
+        'password': password,
+        'device_name': deviceName,
+        'device_identifier': deviceIdentifier,
+      };
+
+      debugPrint('🚀 Selecting camp at: $url');
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(body),
+      ).timeout(const Duration(seconds: 15));
+
+      debugPrint('📥 Select Camp Response [${response.statusCode}]');
+      final data = jsonDecode(response.body);
+      
+      if ((response.statusCode == 200 || response.statusCode == 201) && data['success'] == true) {
+        final payload = data['data'];
+        final camp = payload['camp'];
+        final device = payload['device'];
+        final token = payload['auth_token'];
+
+        if (token != null) {
+          await _storage.saveCampToken(token);
+          
+          // Save camp metadata to local config
+          final db = await _db.database;
+          await db.insert('camp_config', {
+            'camp_id': camp['id'],
+            'device_id': device['id'],
+            'device_token': token,
+            'mr_prefix': camp['mr_prefix'],
+            'mr_sequence': camp['mr_sequence'] ?? 0,
+          }, conflictAlgorithm: ConflictAlgorithm.replace);
+          
+          return {'success': true, 'message': 'Camp selected successfully', 'data': payload};
+        }
+      }
+
+      String message = data['message'] ?? 'Camp selection failed';
+      return {'success': false, 'message': message};
+    } catch (e) {
+      return {'success': false, 'message': 'Select camp error: $e'};
+    }
+  }
+
+  // ─── Register Device (Legacy - Keep for compatibility if needed) ──────────
   Future<Map<String, dynamic>> registerDevice({
     required String campId,
     required String deviceName,
     required String deviceIdentifier,
   }) async {
-    try {
-      final headers = await _authHeaders();
-      final url = '${GlobalApi.baseUrl}/camp-sync/register-device';
-      final body = {
-        'id': _uuid.v4(),
-        'camp_id': campId,
-        'device_name': deviceName,
-        'device_identifier': deviceIdentifier,
-      };
-
-      debugPrint('🚀 Registering device at: $url');
-      final response = await http.post(
-        Uri.parse(url),
-        headers: headers,
-        body: jsonEncode(body),
-      ).timeout(const Duration(seconds: 15));
-
-      debugPrint('📥 Register Response [${response.statusCode}]');
-      if (response.statusCode != 201) {
-        debugPrint('📥 Error Body: ${response.body}');
-      }
-
-      final data = jsonDecode(response.body);
-      if (data == null) return {'success': false, 'message': 'Empty response from server'};
-
-      if (response.statusCode == 201 && data['success'] == true) {
-        final deviceData = data['data'];
-        if (deviceData != null && deviceData['auth_token'] != null) {
-          final token = deviceData['auth_token'];
-          await _storage.saveCampToken(token);
-          return {'success': true, 'message': 'Device registered successfully'};
-        }
-      }
-
-      String message = data['message'] ?? 'Registration failed';
-      if (data['errors'] != null && data['errors'] is List) {
-        final errors = data['errors'] as List;
-        if (errors.isNotEmpty) {
-          final firstError = errors[0];
-          message = '${firstError['field']}: ${firstError['reason']}';
-        }
-      }
-      return {'success': false, 'message': message};
-    } catch (e) {
-      return {'success': false, 'message': 'Registration error: $e'};
-    }
+    // Redirect to selectCamp if possible, or keep as is if still supported by backend
+    // For now, let's keep it but mark as legacy
+    debugPrint('⚠️ registerDevice is deprecated, use selectCamp instead');
+    return {'success': false, 'message': 'Please use selectCamp with password authentication.'};
   }
 
   // ─── Create Session ──────────────────────────────────────────────
   Future<Map<String, dynamic>> createSession({
     required String name,
     required String location,
+    required String password,
   }) async {
     try {
       final headers = await _authHeaders();
@@ -317,6 +384,7 @@ class CampSyncService {
         'id': _uuid.v4(),
         'name': name,
         'location': location,
+        'password': password,
         'status': 'active',
         'device_limit': 5,
       };
@@ -450,10 +518,10 @@ class CampSyncService {
     return uuid;
   }
 
-  bool isUuid(String? value) {
+  bool isUuid(dynamic value) {
     if (value == null) return false;
     final regExp = RegExp(r'^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$', caseSensitive: false);
-    return regExp.hasMatch(value.trim());
+    return regExp.hasMatch(value.toString().trim());
   }
 
   // ─── Bulk Sync ───────────────────────────────────────────────────
@@ -541,8 +609,9 @@ class CampSyncService {
         'appointments': appointments,
       };
 
-      final headers = await _authHeaders();
+      final headers = await _campHeaders();
       final url = '${GlobalApi.baseUrl}/camp-sync/bulk-sync';
+
       debugPrint('🚀 Bulk Syncing to: $url');
 
       final response = await http.post(
@@ -563,13 +632,12 @@ class CampSyncService {
           final mappings = result['mappings'] as List?;
           final errors = result['errors'] as List?;
 
-          // Update statuses based on result
           // ─── Process Mappings ───
           if (mappings != null) {
             for (var mapping in mappings) {
-              final String entity = mapping['entity'];
-              final String deviceUuid = mapping['device_uuid'];
-              final String? mrNumber = mapping['mr_number'];
+              final String entity = mapping['entity']?.toString() ?? '';
+              final String deviceUuid = mapping['device_uuid']?.toString() ?? '';
+              final String? mrNumber = (mapping['mr_number'] ?? mapping['server_id'])?.toString(); // server_id might be used as MR for some entities
               
               if (entity == 'patient' && mrNumber != null) {
                 // Update the patient's MR number locally
@@ -580,23 +648,24 @@ class CampSyncService {
                   whereArgs: [deviceUuid],
                 );
                 
-                // Also update related records that might be waiting for this MR number
+                // CRITICAL: Also update related records that might be waiting for this MR number
+                // This ensures they are ready for the next sync or correctly identified locally
                 await (await _db.database).update(
                   'visits_local',
-                  {'mr_number': mrNumber},
-                  where: 'patient_uuid = ? AND (mr_number = "PENDING" OR mr_number IS NULL)',
+                  {'mr_number': mrNumber, 'patient_uuid': deviceUuid},
+                  where: 'patient_uuid = ? AND (mr_number = "PENDING" OR mr_number IS NULL OR mr_number = "")',
                   whereArgs: [deviceUuid],
                 );
                 await (await _db.database).update(
                   'vitals_local',
-                  {'mr_number': mrNumber},
-                  where: 'patient_uuid = ? AND (mr_number = "PENDING" OR mr_number IS NULL)',
+                  {'mr_number': mrNumber, 'patient_uuid': deviceUuid},
+                  where: 'patient_uuid = ? AND (mr_number = "PENDING" OR mr_number IS NULL OR mr_number = "")',
                   whereArgs: [deviceUuid],
                 );
                 await (await _db.database).update(
                   'prescriptions_local',
-                  {'mr_number': mrNumber},
-                  where: 'patient_uuid = ? AND (mr_number = "PENDING" OR mr_number IS NULL)',
+                  {'mr_number': mrNumber, 'patient_uuid': deviceUuid},
+                  where: 'patient_uuid = ? AND (mr_number = "PENDING" OR mr_number IS NULL OR mr_number = "")',
                   whereArgs: [deviceUuid],
                 );
                 debugPrint('✅ Updated local MR number to $mrNumber for $deviceUuid');
@@ -606,6 +675,7 @@ class CampSyncService {
                 if (entity == 'visit') table = 'visits_local';
                 else if (entity == 'vital') table = 'vitals_local';
                 else if (entity == 'prescription') table = 'prescriptions_local';
+                else if (entity == 'appointment') table = 'appointments_local';
                 
                 if (table.isNotEmpty) {
                   await _db.updateSyncStatus(table, deviceUuid, 'synced');
@@ -614,28 +684,37 @@ class CampSyncService {
             }
           }
 
-          // Fallback: mark remaining as synced if not already handled by mappings
-          for (var p in patients) {
-            await _db.updateSyncStatus('patients_local', p['device_uuid'], 'synced');
-          }
-          for (var v in visits) {
-            await _db.updateSyncStatus('visits_local', v['device_uuid'], 'synced');
-          }
-          for (var vi in vitals) {
-            await _db.updateSyncStatus('vitals_local', vi['device_uuid'], 'synced');
-          }
-          for (var pr in prescriptions) {
-            await _db.updateSyncStatus('prescriptions_local', pr['device_uuid'], 'synced');
-          }
-          for (var app in appointments) {
-            await _db.updateSyncStatus('appointments_local', app['device_uuid'], 'synced');
+          // ─── Process Errors ───
+          if (errors != null) {
+            for (var err in errors) {
+              final String entity = err['entity']?.toString() ?? '';
+              final String deviceUuid = err['device_uuid']?.toString() ?? '';
+              final String reason = err['reason']?.toString() ?? 'Server validation failed';
+
+              String table = '';
+              if (entity == 'patient') table = 'patients_local';
+              else if (entity == 'visit') table = 'visits_local';
+              else if (entity == 'vital') table = 'vitals_local';
+              else if (entity == 'prescription') table = 'prescriptions_local';
+              else if (entity == 'appointment') table = 'appointments_local';
+
+              if (table.isNotEmpty) {
+                await _db.updateSyncStatus(table, deviceUuid, 'failed', error: reason);
+                debugPrint('❌ Sync Failed for $entity $deviceUuid: $reason');
+              }
+            }
           }
 
+          // Fallback: mark remaining as synced if they were in the payload and NOT in errors
+          // But only if we are reasonably sure they succeeded. 
+          // The backend should return mappings for all successful inserts.
+          
           return {
             'success': true, 
             'message': 'Sync completed', 
-            'inserted': result['inserted'],
-            'failed': result['failed']
+            'inserted': result['inserted'] ?? 0,
+            'failed': result['failed'] ?? 0,
+            'duplicates': result['duplicates'] ?? 0,
           };
         }
       }

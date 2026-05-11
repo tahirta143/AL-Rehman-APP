@@ -708,8 +708,21 @@ class PrescriptionProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setDiagnosisAnswer(int questionId, dynamic value) {
-    _diagnosisAnswers[questionId] = value;
+  void setDiagnosisAnswer(int questionId, dynamic value, {bool isMcq = false}) {
+    if (isMcq) {
+      final List<int> current = List<int>.from(_diagnosisAnswers[questionId] is List ? _diagnosisAnswers[questionId] : []);
+      final int valId = int.tryParse(value.toString()) ?? 0;
+      if (valId == 0) return;
+
+      if (current.contains(valId)) {
+        current.remove(valId);
+      } else {
+        current.add(valId);
+      }
+      _diagnosisAnswers[questionId] = current;
+    } else {
+      _diagnosisAnswers[questionId] = value;
+    }
     notifyListeners();
   }
 
@@ -795,13 +808,17 @@ class PrescriptionProvider extends ChangeNotifier {
             (q) => q?['id'] == e.key,
             orElse: () => const {},
           );
+          
+          final val = e.value;
+          final isArray = val is List;
+
           return PrescriptionDiagnosis(
             questionId: e.key,
             questionText: (question?['question_text'] ?? question?['question'] ?? '').toString(),
-            answerText: e.value is String ? e.value : null,
-            answerValue: e.value,
+            answerText: isArray ? null : val?.toString(),
+            answerOptions: isArray ? List<int>.from(val) : null,
           );
-        }).toList(),
+        }).where((d) => (d.answerText != null && d.answerText!.isNotEmpty) || (d.answerOptions != null && d.answerOptions!.isNotEmpty)).toList(),
         eyeDetails: isEye ? _buildEyeDetails() : null,
       );
 

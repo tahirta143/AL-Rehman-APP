@@ -85,14 +85,14 @@ class PrescriptionDiagnosis {
   final String questionText;
   final String? answerText;
   final String? answerDisplay;
-  final dynamic answerValue;
+  final List<int>? answerOptions;
 
   PrescriptionDiagnosis({
     required this.questionId,
     required this.questionText,
     this.answerText,
     this.answerDisplay,
-    this.answerValue,
+    this.answerOptions,
   });
 
   Map<String, dynamic> toJson() => {
@@ -100,16 +100,33 @@ class PrescriptionDiagnosis {
     'question_text': questionText,
     'answer_text': answerText,
     'answer_display': answerDisplay,
-    'answer_value': answerValue,
+    'answer_options': answerOptions,
   };
 
-  factory PrescriptionDiagnosis.fromJson(Map<String, dynamic> json) => PrescriptionDiagnosis(
-    questionId: json['question_id'] ?? 0,
-    questionText: json['question_text'] ?? '',
-    answerText: json['answer_text'],
-    answerDisplay: json['answer_display'],
-    answerValue: json['answer_value'] ?? json['answer_options'],
-  );
+  factory PrescriptionDiagnosis.fromJson(Map<String, dynamic> json) {
+    dynamic optionsRaw = json['answer_options'] ?? json['answer_value'];
+    List<int>? options;
+    if (optionsRaw != null) {
+      if (optionsRaw is List) {
+        options = optionsRaw.map((e) => int.tryParse(e.toString()) ?? 0).where((e) => e != 0).toList();
+      } else if (optionsRaw is String && optionsRaw.startsWith('[')) {
+        try {
+          final decoded = jsonDecode(optionsRaw);
+          if (decoded is List) {
+            options = decoded.map((e) => int.tryParse(e.toString()) ?? 0).where((e) => e != 0).toList();
+          }
+        } catch (_) {}
+      }
+    }
+
+    return PrescriptionDiagnosis(
+      questionId: json['question_id'] ?? 0,
+      questionText: json['question_text'] ?? '',
+      answerText: json['answer_text']?.toString(),
+      answerDisplay: json['answer_display']?.toString(),
+      answerOptions: options,
+    );
+  }
 }
 
 // ─── Eye Prescription Models ─────────────────────────────────────────────────
@@ -355,7 +372,7 @@ class PrescriptionModel {
     'medicines': medicines.map((e) => e.toJson()).toList(),
     'investigations': investigations.map((e) => e.toJson()).toList(),
     'instructions': instructions,
-    'diagnosis': diagnosis.map((e) => e.toJson()).toList(),
+    'diagnosis_answers': diagnosis.map((e) => e.toJson()).toList(),
     'eye_details': eyeDetails?.toJson(),
   };
 

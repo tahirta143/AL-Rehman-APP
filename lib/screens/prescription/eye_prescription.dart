@@ -645,7 +645,7 @@ class _EyeTabSection extends StatelessWidget {
   // Mirrors React's tab permission config exactly
   static const _tabDefs = [
     _EyeTabDef(
-      label: 'Diagnosis',
+      label: 'Questionnaire',
       readPerms: [Perm.eyeDiagnosisRead, Perm.eyeDiagnosisUpdate, Perm.eyeRecordRead, Perm.eyeRecordUpdate, Perm.prescriptionRead, Perm.prescriptionCreate],
       writePerms: [Perm.eyeDiagnosisUpdate, Perm.eyeRecordUpdate, Perm.prescriptionCreate],
     ),
@@ -1089,12 +1089,25 @@ class _DiagnosisTab extends StatelessWidget {
                   spacing: 8,
                   runSpacing: 4,
                   children: opts.map((opt) {
+                    final optId = opt is Map ? (opt['id'] ?? 0) : 0;
                     final optStr = opt is Map ? (opt['option_text'] ?? opt['label'] ?? opt.toString()) : opt.toString();
-                    final isSelected = provider.diagnosisAnswers[q['id']] == optStr || provider.diagnosisAnswers[q['id']] == opt;
+                    
+                    final isArray = provider.diagnosisAnswers[q['id']] is List;
+                    final currentAnswers = isArray ? List<int>.from(provider.diagnosisAnswers[q['id']]) : [];
+                    final isSelected = isArray 
+                        ? currentAnswers.contains(optId)
+                        : (provider.diagnosisAnswers[q['id']]?.toString() == optStr || provider.diagnosisAnswers[q['id']]?.toString() == optId.toString());
+
                     return ChoiceChip(
                       label: Text(optStr, style: const TextStyle(fontSize: 12)),
                       selected: isSelected,
-                      onSelected: (val) => provider.setDiagnosisAnswer(q['id'], val ? optStr : null),
+                      onSelected: (val) {
+                        if (mode == 'mcq') {
+                          provider.setDiagnosisAnswer(q['id'], optId, isMcq: true);
+                        } else {
+                          provider.setDiagnosisAnswer(q['id'], val ? optStr : null);
+                        }
+                      },
                       selectedColor: kTeal.withOpacity(0.2),
                       checkmarkColor: kTeal,
                       labelStyle: TextStyle(color: isSelected ? kTeal : kTextMid, fontSize: 12),
@@ -1919,7 +1932,7 @@ class _OldVisitCard extends StatelessWidget {
                             style: const TextStyle(fontSize: 11, color: kTextDark),
                             children: [
                               TextSpan(text: '${d.questionText}: ', style: const TextStyle(fontWeight: FontWeight.bold)),
-                              TextSpan(text: d.answerText ?? (d.answerValue?.toString() ?? '-')),
+                              TextSpan(text: d.answerDisplay ?? d.answerText ?? (d.answerOptions != null ? d.answerOptions!.join(', ') : '-')),
                             ],
                           ),
                         ),

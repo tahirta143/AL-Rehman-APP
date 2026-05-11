@@ -147,37 +147,71 @@ class SyncProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> registerDevice(String campId, String deviceName) async {
+  Future<List<dynamic>> fetchAvailableCamps() async {
+    _lastErrorMessage = null;
+    notifyListeners();
+    try {
+      final result = await _syncService.fetchAvailableCamps();
+      if (result['success'] == true) {
+        return result['data'] as List? ?? [];
+      } else {
+        _lastErrorMessage = result['message'];
+        return [];
+      }
+    } catch (e) {
+      _lastErrorMessage = e.toString();
+      return [];
+    } finally {
+      notifyListeners();
+    }
+  }
+
+  Future<bool> selectCamp({
+    required String campId,
+    required String password,
+    required String deviceName,
+  }) async {
     _isSyncing = true;
     _lastErrorMessage = null;
     notifyListeners();
     try {
       // Use device_info_plus or a random ID
       final identifier = _syncService.generateUuid(); 
-      final result = await _syncService.registerDevice(
+      final result = await _syncService.selectCamp(
         campId: campId,
+        password: password,
         deviceName: deviceName,
         deviceIdentifier: identifier,
       );
       if (result['success'] == true) {
         _isDeviceRegistered = true;
+        _campId = campId;
+        notifyListeners();
+        return true;
       } else {
         _lastErrorMessage = result['message'];
+        return false;
       }
     } catch (e) {
       _lastErrorMessage = e.toString();
+      return false;
     } finally {
       _isSyncing = false;
       notifyListeners();
     }
   }
 
-  Future<Map<String, dynamic>> createSession(String name, String location) async {
+  Future<void> registerDevice(String campId, String deviceName) async {
+    _lastErrorMessage = "Legacy registration is disabled. Please use camp selection with password.";
+    notifyListeners();
+  }
+
+  Future<Map<String, dynamic>> createSession(String name, String location, String password) async {
     _isSyncing = true;
     _lastErrorMessage = null;
     notifyListeners();
     try {
-      final result = await _syncService.createSession(name: name, location: location);
+      final result = await _syncService.createSession(name: name, location: location, password: password);
       if (result['success'] != true) {
         _lastErrorMessage = result['message'];
       }

@@ -132,7 +132,7 @@ class _SyncDashboardBodyState extends State<_SyncDashboardBody> {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: isOnline 
-            ? [const Color(0xFF00B5AD), const Color(0xFF00897B)]
+            ? [const Color(0xFF00B5AD), const Color(0xFF00B5AD)]
             : [const Color(0xFF64748B), const Color(0xFF475569)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -140,7 +140,7 @@ class _SyncDashboardBodyState extends State<_SyncDashboardBody> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: (isOnline ? const Color(0xFF00B5AD) : const Color(0xFF64748B)).withOpacity(0.3),
+            color: (isOnline ? const Color(0xFF00B5AD) : const Color(0xFF00B5AD)).withOpacity(0.3),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -227,63 +227,36 @@ class _SyncDashboardBodyState extends State<_SyncDashboardBody> {
         children: [
           if (!prov.isDeviceRegistered) ...[
             const Text(
-              'Device registration required for this camp.',
-              style: TextStyle(fontSize: 13, color: Colors.orange, fontWeight: FontWeight.bold),
+              'Select an active camp to begin.',
+              style: TextStyle(fontSize: 14, color: Color(0xFF475569), fontWeight: FontWeight.w500),
             ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _campIdCtrl,
-                    decoration: InputDecoration(
-                      labelText: 'Camp UUID (Required)',
-                      hintText: 'e.g. f47ac10b...',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                TextButton.icon(
-                  onPressed: isOnline ? () => _showCreateSessionDialog(context, prov) : null,
-                  icon: const Icon(Icons.add_circle_outline, size: 18),
-                  label: const Text('New', style: TextStyle(fontSize: 12)),
-                ),
-                TextButton.icon(
-                  onPressed: () => _showResetDialog(context, prov),
-                  icon: const Icon(Icons.restart_alt_rounded, size: 18, color: Colors.red),
-                  label: const Text('Reset', style: TextStyle(fontSize: 12, color: Colors.red)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _deviceNameCtrl,
-              decoration: InputDecoration(
-                labelText: 'Device Name',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: isOnline ? () => _showCampPicker(context, prov) : null,
+              icon: const Icon(Icons.pin_drop_rounded),
+              label: const Text('Pick a Camp'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF00B5AD),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                minimumSize: const Size(double.infinity, 50),
               ),
             ),
             const SizedBox(height: 12),
             Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Expanded(
-                  child: Text('ID: $_deviceIdentifier', style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                TextButton.icon(
+                  onPressed: isOnline ? () => _showCreateSessionDialog(context, prov) : null,
+                  icon: const Icon(Icons.add_circle_outline, size: 18),
+                  label: const Text('Create New Camp', style: TextStyle(fontSize: 13)),
                 ),
-                ElevatedButton(
-                  onPressed: (isOnline && !prov.isSyncing)
-                    ? () async {
-                        await prov.registerDevice(_campIdCtrl.text, _deviceNameCtrl.text);
-                        final error = prov.lastErrorMessage;
-                        _scaffoldKey.currentState?.hideCurrentSnackBar();
-                        if (error != null) {
-                          _scaffoldKey.currentState?.showSnackBar(SnackBar(content: Text(error), backgroundColor: Colors.red));
-                        } else {
-                          _scaffoldKey.currentState?.showSnackBar(const SnackBar(content: Text('Device registered!'), backgroundColor: Colors.green));
-                        }
-                      }
-                    : null,
-                  child: const Text('Register'),
+                const SizedBox(width: 16),
+                TextButton.icon(
+                  onPressed: () => _showResetDialog(context, prov),
+                  icon: const Icon(Icons.restart_alt_rounded, size: 18, color: Colors.red),
+                  label: const Text('Reset', style: TextStyle(fontSize: 13, color: Colors.red)),
                 ),
               ],
             ),
@@ -423,9 +396,109 @@ class _SyncDashboardBodyState extends State<_SyncDashboardBody> {
     );
   }
 
+  void _showCampPicker(BuildContext context, SyncProvider prov) async {
+    final camps = await prov.fetchAvailableCamps();
+    if (!mounted) return;
+
+    if (camps.isEmpty && prov.lastErrorMessage != null) {
+      _scaffoldKey.currentState?.showSnackBar(SnackBar(content: Text(prov.lastErrorMessage!)));
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (context, scrollController) => Column(
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('Available Camps', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            ),
+            Expanded(
+              child: camps.isEmpty 
+                ? const Center(child: Text('No active camps found.'))
+                : ListView.builder(
+                    controller: scrollController,
+                    itemCount: camps.length,
+                    itemBuilder: (context, index) {
+                      final camp = camps[index];
+                      return ListTile(
+                        leading: const CircleAvatar(child: Icon(Icons.pin_drop)),
+                        title: Text(camp['name'] ?? 'Unnamed Camp'),
+                        subtitle: Text(camp['location'] ?? 'Unknown Location'),
+                        onTap: () {
+                          Navigator.pop(context);
+                          _showPasswordDialog(context, prov, camp);
+                        },
+                      );
+                    },
+                  ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showPasswordDialog(BuildContext context, SyncProvider prov, Map<String, dynamic> camp) {
+    final passCtrl = TextEditingController();
+    final nameCtrl = TextEditingController(text: _deviceNameCtrl.text);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Enter Password for ${camp['name']}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: passCtrl,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'Camp Password'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: nameCtrl,
+              decoration: const InputDecoration(labelText: 'Device Name'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              if (passCtrl.text.isEmpty) return;
+              final success = await prov.selectCamp(
+                campId: camp['id'],
+                password: passCtrl.text,
+                deviceName: nameCtrl.text,
+              );
+              if (!mounted) return;
+              if (success) {
+                Navigator.pop(context);
+                _campIdCtrl.text = camp['id'];
+                _scaffoldKey.currentState?.showSnackBar(const SnackBar(content: Text('Camp selected successfully!'), backgroundColor: Colors.green));
+              } else {
+                _scaffoldKey.currentState?.showSnackBar(SnackBar(content: Text(prov.lastErrorMessage ?? 'Failed to select camp'), backgroundColor: Colors.red));
+              }
+            },
+            child: const Text('Connect'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showCreateSessionDialog(BuildContext context, SyncProvider prov) {
+    // ... Existing implementation remains mostly valid, but might need password field if backend requires it now
     final nameCtrl = TextEditingController();
     final locCtrl = TextEditingController();
+    final passCtrl = TextEditingController();
 
     showDialog(
       context: context,
@@ -436,20 +509,23 @@ class _SyncDashboardBodyState extends State<_SyncDashboardBody> {
           children: [
             TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Camp Name')),
             TextField(controller: locCtrl, decoration: const InputDecoration(labelText: 'Location')),
+            TextField(controller: passCtrl, decoration: const InputDecoration(labelText: 'Camp Password (Required)')),
           ],
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () async {
-              if (nameCtrl.text.isEmpty) return;
-              final result = await prov.createSession(nameCtrl.text, locCtrl.text);
+              if (nameCtrl.text.isEmpty || passCtrl.text.isEmpty) return;
+              // Assuming createSession on backend also updated to handle password
+              // If not, this part might need adjustment in sync_provider.dart
+              final result = await prov.createSession(nameCtrl.text, locCtrl.text, passCtrl.text); 
+              // Note: backend implementation of POST /sessions might need password too.
+              // For now we just follow the UI flow.
               if (!mounted) return;
               if (result['success'] == true) {
                 Navigator.pop(context);
-                setState(() => _campIdCtrl.text = result['data']['id']);
-                _scaffoldKey.currentState?.hideCurrentSnackBar();
-                _scaffoldKey.currentState?.showSnackBar(const SnackBar(content: Text('Camp created! Now tap Register.'), backgroundColor: Colors.green));
+                _scaffoldKey.currentState?.showSnackBar(const SnackBar(content: Text('Camp created! You can now pick it from the list.'), backgroundColor: Colors.green));
               }
             },
             child: const Text('Create'),
@@ -464,7 +540,7 @@ class _SyncDashboardBodyState extends State<_SyncDashboardBody> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Reset Camp Config?'),
-        content: const Text('This will clear your device registration and camp configuration. Local patient data will NOT be deleted, but you will need to re-register this device.'),
+        content: const Text('This will clear your device registration and camp configuration. Local patient data will NOT be deleted, but you will need to re-select a camp.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           TextButton(
@@ -483,3 +559,4 @@ class _SyncDashboardBodyState extends State<_SyncDashboardBody> {
     );
   }
 }
+

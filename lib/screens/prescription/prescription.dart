@@ -1066,7 +1066,7 @@ class _TabSection extends StatelessWidget {
 
   static const _tabs = [
     [Icons.notes_outlined, 'Notes'],
-    [Icons.medical_information_outlined, 'Diagnosis'],
+    [Icons.medical_information_outlined, 'Observations'],
     [Icons.science_outlined, 'Investigations'],
     [Icons.medication_outlined, 'Medicines'],
     [Icons.assignment_outlined, 'Instructions'],
@@ -1513,7 +1513,7 @@ class _OldVisitsTabState extends State<_OldVisitsTab> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: answers.map<Widget>((ans) {
                   final qText = ans.questionText.isNotEmpty ? ans.questionText : 'Q#${ans.questionId}';
-                  final aText = (ans.answerDisplay ?? ans.answerText ?? ans.answerValue ?? '—').toString();
+                  final aText = (ans.answerDisplay ?? ans.answerText ?? (ans.answerOptions != null ? ans.answerOptions!.join(', ') : '—')).toString();
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 2),
                     child: RichText(text: TextSpan(
@@ -2385,14 +2385,24 @@ class _DiagnosisTab extends StatelessWidget {
                   Wrap(
                     spacing: 8,
                     children: qOptions.map((opt) {
-                      // opt can be a String or a Map with 'option_text'
+                      final optId = opt is Map ? (opt['id'] ?? 0) : 0;
                       final optStr = opt is Map ? (opt['option_text'] ?? opt['label'] ?? opt.toString()) : opt.toString();
-                      final isSelected = provider.diagnosisAnswers[qId] == optStr || provider.diagnosisAnswers[qId] == opt;
+                      
+                      final isArray = provider.diagnosisAnswers[qId] is List;
+                      final currentAnswers = isArray ? List<int>.from(provider.diagnosisAnswers[qId]) : [];
+                      final isSelected = isArray 
+                          ? currentAnswers.contains(optId)
+                          : (provider.diagnosisAnswers[qId]?.toString() == optStr || provider.diagnosisAnswers[qId]?.toString() == optId.toString());
+
                       return ChoiceChip(
                         label: Text(optStr),
                         selected: isSelected,
                         onSelected: (val) {
-                          provider.setDiagnosisAnswer(qId, val ? optStr : null);
+                          if (qType == 'mcq') {
+                            provider.setDiagnosisAnswer(qId, optId, isMcq: true);
+                          } else {
+                            provider.setDiagnosisAnswer(qId, val ? optStr : null);
+                          }
                         },
                         selectedColor: kTeal.withOpacity(0.2),
                         checkmarkColor: kTeal,
