@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/sync_provider.dart';
 import '../../custum widgets/drawer/base_scaffold.dart';
+import '../../core/providers/permission_provider.dart';
+import '../../core/permissions/permission_keys.dart';
 import 'package:animate_do/animate_do.dart';
 
 class SyncDashboardScreen extends StatelessWidget {
@@ -243,23 +245,26 @@ class _SyncDashboardBodyState extends State<_SyncDashboardBody> {
                 minimumSize: const Size(double.infinity, 50),
               ),
             ),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                TextButton.icon(
-                  onPressed: isOnline ? () => _showCreateSessionDialog(context, prov) : null,
-                  icon: const Icon(Icons.add_circle_outline, size: 18),
-                  label: const Text('Create New Camp', style: TextStyle(fontSize: 13)),
+            if (context.read<PermissionProvider>().can(Perm.campSessionCreate))
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    TextButton.icon(
+                      onPressed: isOnline ? () => _showCreateSessionDialog(context, prov) : null,
+                      icon: const Icon(Icons.add_circle_outline, size: 18),
+                      label: const Text('Create New Camp', style: TextStyle(fontSize: 13)),
+                    ),
+                    const SizedBox(width: 16),
+                    TextButton.icon(
+                      onPressed: () => _showResetDialog(context, prov),
+                      icon: const Icon(Icons.restart_alt_rounded, size: 18, color: Colors.red),
+                      label: const Text('Reset', style: TextStyle(fontSize: 13, color: Colors.red)),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 16),
-                TextButton.icon(
-                  onPressed: () => _showResetDialog(context, prov),
-                  icon: const Icon(Icons.restart_alt_rounded, size: 18, color: Colors.red),
-                  label: const Text('Reset', style: TextStyle(fontSize: 13, color: Colors.red)),
-                ),
-              ],
-            ),
+              ),
             const Divider(height: 32),
           ] else ...[
             const Text(

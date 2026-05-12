@@ -8,6 +8,7 @@ import '../../providers/prescription_provider/prescription_provider.dart';
 import '../../core/providers/permission_provider.dart';
 import '../../models/mr_model/mr_patient_model.dart';
 import '../../custum widgets/custom_loader.dart';
+import 'widgets/shared_consultation_widgets.dart';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const kTeal = Color(0xFF00B5AD);
@@ -66,166 +67,60 @@ class _FundusExaminationScreenState extends State<FundusExaminationScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                    if (isMobile) ...[
-                    _ConsultationDropdown(prescriptionProvider: prescriptionProvider, fundusProvider: fundusProvider),
-                    const SizedBox(height: 16),
-                  ],
+                     SharedConsultationDropdown(
+                       department: 'Eye',
+                       onSelect: (p) {
+                         prescriptionProvider.selectConsultationPatient(p, department: 'Eye');
+                         fundusProvider.fetchHistory(p['patient_mr_number']);
+                       },
+                     ),
+                     const SizedBox(height: 16),
+                   ],
+ 
+                   // ── Patient Info ──────────────────────────────────────────
+                   FadeInUp(
+                     duration: const Duration(milliseconds: 400),
+                     child: _PatientInfoCard(
+                       isTablet: !isMobile,
+                       screenW: mq.size.width,
+                       prescriptionProvider: prescriptionProvider,
+                       fundusProvider: fundusProvider,
+                     ),
+                   ),
+                   const SizedBox(height: 20),
+ 
+                   // ── Examination Form ──────────────────────────────────────
+                   FadeInUp(
+                     delay: const Duration(milliseconds: 100),
+                     child: _ExaminationForm(
+                       provider: fundusProvider,
+                       prescriptionProvider: prescriptionProvider,
+                       isMobile: isMobile,
+                     ),
+                   ),
+                 ],
+               ),
+             ),
+           ),
+ 
+           // ── Sidebar (Desktop Only) ────────────────────────────────────────
+           if (!isMobile)
+             Expanded(
+               flex: 3,
+               child: SharedConsultationSidebar(
+                 department: 'Eye',
+                 onSelect: (p) {
+                   prescriptionProvider.selectConsultationPatient(p, department: 'Eye');
+                   fundusProvider.fetchHistory(p['patient_mr_number']);
+                 },
+               ),
+             ),
+         ],
+       ),
+     );
+   }
+ }
 
-                  // ── Patient Info ──────────────────────────────────────────
-                  FadeInUp(
-                    duration: const Duration(milliseconds: 400),
-                    child: _PatientInfoCard(
-                      isTablet: !isMobile,
-                      screenW: mq.size.width,
-                      prescriptionProvider: prescriptionProvider,
-                      fundusProvider: fundusProvider,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // ── Examination Form ──────────────────────────────────────
-                  FadeInUp(
-                    delay: const Duration(milliseconds: 100),
-                    child: _ExaminationForm(
-                      provider: fundusProvider,
-                      prescriptionProvider: prescriptionProvider,
-                      isMobile: isMobile,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // ── Sidebar (Desktop Only) ────────────────────────────────────────
-          if (!isMobile)
-            const Expanded(
-              flex: 3,
-              child: _ConsultationSidebar(),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Consultation Side Components ──────────────────────────────────────────────
-
-class _ConsultationDropdown extends StatelessWidget {
-  final PrescriptionProvider prescriptionProvider;
-  final FundusProvider fundusProvider;
-  const _ConsultationDropdown({required this.prescriptionProvider, required this.fundusProvider});
-
-  @override
-  Widget build(BuildContext context) {
-    final eyePatients = prescriptionProvider.consultationPatients.where((p) => (p['doctor_department'] ?? '').toString().toLowerCase().contains('eye')).toList();
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF1F5F9), 
-        borderRadius: BorderRadius.circular(10), 
-        border: Border.all(color: kBorder),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<dynamic>(
-          isExpanded: true,
-          hint: Row(children: [const Icon(Icons.people_outline, size: 18, color: kTeal), const SizedBox(width: 8), Text(prescriptionProvider.isLoadingPatients ? 'Loading...' : 'Select Eye Patient', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: kTextDark))]),
-          onChanged: (p) {
-             prescriptionProvider.selectConsultationPatient(p);
-             fundusProvider.fetchHistory(p['patient_mr_number']);
-          },
-          items: eyePatients.map((p) => DropdownMenuItem(
-            value: p, 
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(p['patient_name'] ?? '', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                Text('MR: ${p['patient_mr_number']} | ${p['receipt_id']}', style: const TextStyle(fontSize: 10, color: kTextMid)),
-              ],
-            )
-          )).toList(),
-        ),
-      ),
-    );
-  }
-}
-
-class _ConsultationSidebar extends StatelessWidget {
-  const _ConsultationSidebar();
-
-  @override
-  Widget build(BuildContext context) {
-    final prescriptionProvider = context.watch<PrescriptionProvider>();
-    final fundusProvider = context.watch<FundusProvider>();
-    final eyePatients = prescriptionProvider.consultationPatients.where((p) => (p['doctor_department'] ?? '').toString().toLowerCase().contains('eye')).toList();
-
-    return Container(
-      margin: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: kWhite,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: kBorder),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4)],
-      ),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(colors: [kTeal, Color(0xFF0D9488)]),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.assignment_ind, color: kWhite, size: 16),
-                const SizedBox(width: 8),
-                const Text('Eye Consultations', style: TextStyle(color: kWhite, fontWeight: FontWeight.bold, fontSize: 13)),
-                const Spacer(),
-                IconButton(
-                  onPressed: () => prescriptionProvider.loadConsultationPatients(), 
-                  icon: const Icon(Icons.refresh, color: kWhite, size: 16), 
-                  padding: EdgeInsets.zero, 
-                  constraints: const BoxConstraints(),
-                ),
-              ],
-            ),
-          ),
-          if (prescriptionProvider.isLoadingPatients)
-            const Expanded(child: Center(child: CustomLoader(size: 30, color: kTeal)))
-          else if (eyePatients.isEmpty)
-            Expanded(child: Center(child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.history, size: 40, color: kTextMid.withOpacity(0.3)),
-                const SizedBox(height: 8),
-                const Text('No eye patients today', style: TextStyle(fontSize: 11, color: kTextMid)),
-              ],
-            )))
-          else
-            Expanded(
-              child: ListView.separated(
-                itemCount: eyePatients.length,
-                separatorBuilder: (c, i) => const Divider(height: 1),
-                itemBuilder: (c, i) {
-                  final p = eyePatients[i];
-                  return ListTile(
-                    dense: true,
-                    title: Text(p['patient_name'] ?? 'Unknown', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                    subtitle: Text('MR: ${p['patient_mr_number']} | ${p['service_detail'] ?? ''}', style: const TextStyle(fontSize: 10)),
-                    onTap: () {
-                       prescriptionProvider.selectConsultationPatient(p);
-                       fundusProvider.fetchHistory(p['patient_mr_number']);
-                    },
-                  );
-                },
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
 
 // ─── Patient Info Card ────────────────────────────────────────────────────────
 

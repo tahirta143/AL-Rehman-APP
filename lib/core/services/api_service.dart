@@ -134,4 +134,42 @@ class ApiService {
       );
     }
   }
+
+  // ─── GET /api/auth/me ───────────────────────────────────────────
+  Future<Map<String, dynamic>> fetchProfile() async {
+    try {
+      final headers = await _authHeaders();
+      final response = await http
+          .get(Uri.parse('${GlobalApi.baseUrl}/auth/me'), headers: headers)
+          .timeout(const Duration(seconds: 15));
+
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } catch (e) {
+      return {'success': false, 'message': 'Failed to fetch profile: $e'};
+    }
+  }
+
+  // ─── PUT /api/auth/change-password ──────────────────────────────
+  Future<Map<String, dynamic>> changePassword(
+    String currentPassword,
+    String newPassword,
+  ) async {
+    try {
+      final headers = await _authHeaders();
+      final response = await http
+          .put(
+            Uri.parse('${GlobalApi.baseUrl}/auth/change-password'),
+            headers: headers,
+            body: jsonEncode({
+              'current_password': currentPassword,
+              'new_password': newPassword,
+            }),
+          )
+          .timeout(const Duration(seconds: 15));
+
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } catch (e) {
+      return {'success': false, 'message': 'Failed to change password: $e'};
+    }
+  }
 }

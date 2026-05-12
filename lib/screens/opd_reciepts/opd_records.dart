@@ -327,7 +327,9 @@ class _OpdRecordsScreenState extends State<OpdRecordsScreen> {
 
           final allReceipts = prov.receipts.toList().reversed.toList();
           final hasActiveFilters = _fSearch.isNotEmpty || _fStart != null || _fEnd != null || _fYear != 'All' || _fMonth != 'All';
-          final filtered = hasActiveFilters ? _applyFilters(allReceipts) : <Map<String, dynamic>>[];
+          // Show all loaded receipts when no filter is active (instead of empty list).
+          // The infinite-scroll listener still pages in more records via loadMoreReceipts().
+          final filtered = hasActiveFilters ? _applyFilters(allReceipts) : allReceipts;
 
           return Column(children: [
             _buildTopBar(),

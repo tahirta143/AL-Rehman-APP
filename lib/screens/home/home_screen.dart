@@ -17,6 +17,10 @@ import '../prescription/eye_prescription.dart';
 import '../consultation_payments/consultation_payments.dart';
 import '../add_expenses/add_expenses.dart';
 import '../shift_management/shift_management.dart';
+import '../profile/profile_screen.dart';
+import '../sync/sync_dashboard.dart';
+
+const kTeal = Color(0xFF00B5AD);
 
 class HomeScreen extends StatelessWidget {
   final bool useScaffold;
@@ -75,6 +79,7 @@ class _HomeBody extends StatelessWidget {
       const _NavCard(label: "Add Expenses", desc: "Record expenses", icon: Icons.credit_card_rounded, drawerIndex: 2, permission: Perm.expenseRead),
       const _NavCard(label: "Shift Mgmt", desc: "Open/Close shifts", icon: Icons.access_time_rounded, drawerIndex: 7, permission: Perm.opdShiftRead),
       const _NavCard(label: "Eye Prescription", desc: "eye workflow", icon: Icons.remove_red_eye_outlined, drawerIndex: 12, anyOf: [Perm.eyeRecordRead, Perm.eyeRecordUpdate]),
+      const _NavCard(label: "Camp Sync", desc: "Camp & data sync", icon: Icons.sync_rounded, drawerIndex: 100, permission: Perm.campDashboardRead),
     ];
 
     final accessibleCards = allCards.where((c) {
@@ -235,14 +240,51 @@ class _HomeBody extends StatelessWidget {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              Container(
-                width: 44,
-                height: 44,
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
+              PopupMenuButton<String>(
+                onSelected: (value) {
+                  if (value == 'profile') {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                    );
+                  } else if (value == 'logout') {
+                    // Handle logout - typically clear providers and pop to login
+                    context.read<PermissionProvider>().clear();
+                    Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+                  }
+                },
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                icon: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.more_vert_rounded, color: Color(0xFF00B5AD), size: 22),
                 ),
-                child: const Icon(Icons.more_vert_rounded, color: Color(0xFF00B5AD), size: 22),
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'profile',
+                    child: Row(
+                      children: [
+                        Icon(Icons.person_outline, size: 20, color: kTeal),
+                        SizedBox(width: 12),
+                        Text('My Profile'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'logout',
+                    child: Row(
+                      children: [
+                        Icon(Icons.logout_rounded, size: 20, color: Colors.redAccent),
+                        SizedBox(width: 12),
+                        Text('Logout', style: TextStyle(color: Colors.redAccent)),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -512,6 +554,7 @@ class _ModuleCard extends StatelessWidget {
       case 6: return const ConsultantPaymentsScreen();
       case 2: return const ExpensesScreen();
       case 7: return const ShiftManagementScreen();
+      case 100: return const SyncDashboardScreen();
       default: return const dash.DashboardScreen();
     }
   }

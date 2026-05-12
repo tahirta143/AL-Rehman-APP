@@ -149,6 +149,15 @@ class Perm {
   static const accessUserGroupsUpdate  = 'ACCESS.USER_GROUPS.UPDATE';
   static const accessIpRead        = 'ACCESS.IP.READ';
 
+  // ─── Profile ──────────────────────────────────────
+  static const profilePasswordUpdate = 'PROFILE.PASSWORD.UPDATE';
+
+  // ─── Camps ────────────────────────────────────────
+  static const campDashboardRead    = 'CAMPS.DASHBOARD.READ';
+  static const campDashboardDelete  = 'CAMPS.DASHBOARD.DELETE';
+  static const campSessionCreate    = 'CAMPS.SESSION.CREATE';
+  static const campSessionUpdate    = 'CAMPS.SESSION.UPDATE';
+
   /// Super Admin wildcard — matches everything
   static const wildcard = '*';
 }

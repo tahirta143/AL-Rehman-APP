@@ -9,6 +9,7 @@ import '../../models/vitals_model/vitals_model.dart';
 import '../../custum widgets/custom_loader.dart';
 import '../../core/services/pdf_eye_prescription_service.dart';
 import '../../core/utils/wait_time_helper.dart';
+import 'widgets/shared_consultation_widgets.dart';
 import '../../main.dart';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -63,7 +64,7 @@ class _EyePrescriptionScreenState extends State<EyePrescriptionScreen>
         children: [
           Column(
             children: [
-              if (isMobile) _EyeConsultationDropdown(provider: provider),
+              if (isMobile) const SharedConsultationDropdown(department: 'Eye'),
               Expanded(
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -75,7 +76,7 @@ class _EyePrescriptionScreenState extends State<EyePrescriptionScreen>
                     if (!isMobile)
                       const Expanded(
                         flex: 3,
-                        child: _EyeConsultationSidebar(),
+                        child: SharedConsultationSidebar(department: 'Eye'),
                       ),
                   ],
                 ),
@@ -90,251 +91,6 @@ class _EyePrescriptionScreenState extends State<EyePrescriptionScreen>
   }
 }
 
-class _EyeConsultationDropdown extends StatelessWidget {
-  final PrescriptionProvider provider;
-  const _EyeConsultationDropdown({required this.provider});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF1F5F9),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: kBorder),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<dynamic>(
-          isExpanded: true,
-          hint: Row(
-            children: [
-              const Icon(Icons.people_outline, size: 18, color: kTeal),
-              const SizedBox(width: 8),
-              Text(provider.isLoadingPatients ? 'Loading patients...' : 'Select Consultation Patient', 
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: kTextDark)),
-            ],
-          ),
-          value: null,
-          onChanged: (val) => provider.selectConsultationPatient(val, department: 'Eye'),
-          items: provider.consultationPatients.map((p) {
-            final waitTime = WaitTimeHelper.getWaitTime(p['date'], p['time']);
-            return DropdownMenuItem(
-              value: p,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: [
-                      Text(p['patient_name'] ?? '', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                      if (p['token_number'] != null) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: kTeal,
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(color: kTeal.withValues(alpha: 0.3), blurRadius: 4, offset: const Offset(0, 1)),
-                            ],
-                          ),
-                          child: Text(
-                            'T#${p['token_number']}',
-                            style: const TextStyle(
-                              fontSize: 8,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.white,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ),
-                      ],
-                      if (waitTime != null) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.amber.shade50,
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(color: Colors.amber.shade200),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.access_time, size: 8, color: Colors.amber.shade800),
-                              const SizedBox(width: 4),
-                              Text(waitTime, style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.amber.shade800)),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                  Text('MR: ${p['patient_mr_number']} | ${p['receipt_id']}', style: const TextStyle(fontSize: 10, color: kTextMid)),
-                ],
-              ),
-            );
-          }).toList(),
-        ),
-      ),
-    );
-  }
-}
-
-class _EyeConsultationSidebar extends StatefulWidget {
-  const _EyeConsultationSidebar();
-
-  @override
-  State<_EyeConsultationSidebar> createState() => _EyeConsultationSidebarState();
-}
-
-class _EyeConsultationSidebarState extends State<_EyeConsultationSidebar> {
-  @override
-  void initState() {
-    super.initState();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final provider = context.watch<PrescriptionProvider>();
-    return Container(
-      margin: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: kWhite,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: kBorder),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4)],
-      ),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(colors: [Color(0xFF2563EB), Color(0xFF1D4ED8)]),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(12.0)),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.assignment_ind, color: kWhite, size: 16),
-                const SizedBox(width: 8),
-                const Text('Consultation Patients', style: TextStyle(color: kWhite, fontWeight: FontWeight.bold, fontSize: 13)),
-                const Spacer(),
-                IconButton(
-                  icon: Icon(Icons.refresh, color: kWhite.withOpacity(0.8), size: 16),
-                  onPressed: provider.loadConsultationPatients,
-                  constraints: const BoxConstraints(),
-                  padding: EdgeInsets.zero,
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: provider.isLoadingPatients
-                ? const Center(child: CircularProgressIndicator(strokeWidth: 2, color: kTeal))
-                : provider.consultationPatients.isEmpty
-                    ? const _EyeSidebarPlaceholder(icon: Icons.history, message: 'No consultations today')
-                    : ListView.separated(
-                        itemCount: provider.consultationPatients.length,
-                        separatorBuilder: (_, __) => const Divider(height: 1),
-                        itemBuilder: (context, idx) {
-                          final p = provider.consultationPatients[idx];
-                          final isPending = p['sync_status'] == 'pending';
-                          final waitTime = WaitTimeHelper.getWaitTime(p['date'], p['time']);
-                          return ListTile(
-                            dense: true,
-                            onTap: () => provider.selectConsultationPatient(p, department: 'Eye'),
-                            title: Row(
-                              children: [
-                                Expanded(child: Text(p['patient_name'] ?? '', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
-                                if (isPending) ...[
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: Colors.orange.shade50,
-                                      borderRadius: BorderRadius.circular(4),
-                                      border: Border.all(color: Colors.orange.shade200),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(Icons.cloud_off_rounded, size: 10, color: Colors.orange.shade700),
-                                        const SizedBox(width: 4),
-                                        Text('Pending', style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.orange.shade700)),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                ] else if (p['token_number'] != null) ...[
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: kTeal,
-                                      borderRadius: BorderRadius.circular(12),
-                                      boxShadow: [
-                                        BoxShadow(color: kTeal.withValues(alpha: 0.3), blurRadius: 4, offset: const Offset(0, 1)),
-                                      ],
-                                    ),
-                                    child: Text(
-                                      '#${p['token_number']}',
-                                      style: const TextStyle(
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.w900,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                ],
-                              ],
-                            ),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(p['service_detail'] ?? '', style: const TextStyle(fontSize: 10, color: kTextMid)),
-                                if (waitTime != null)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 2),
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.access_time, size: 10, color: Colors.amber.shade700),
-                                        const SizedBox(width: 4),
-                                        Text(waitTime, style: TextStyle(fontSize: 9, color: Colors.amber.shade800, fontWeight: FontWeight.w500)),
-                                      ],
-                                    ),
-                                  ),
-                              ],
-                            ),
-                            trailing: Text(p['patient_mr_number']?.toString() ?? '', style: const TextStyle(fontSize: 10, color: Color(0xFF2563EB), fontWeight: FontWeight.bold)),
-                          );
-                        },
-                      ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _EyeSidebarPlaceholder extends StatelessWidget {
-  final IconData icon;
-  final String message;
-  const _EyeSidebarPlaceholder({required this.icon, required this.message});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 40, color: kTextMid.withOpacity(0.3)),
-          const SizedBox(height: 8),
-          Text(message, style: TextStyle(fontSize: 11, color: kTextMid.withOpacity(0.6))),
-        ],
-      ),
-    );
-  }
-}
 
 class _EyePrescriptionBody extends StatelessWidget {
   final TabController tabController;

@@ -92,7 +92,7 @@ class OpdReceiptApiModel {
           '',
       patientAddress: json['patient_address'] as String? ??
           json['address'] as String?,
-      date: json['date'] as String? ?? '',
+      date: json['date'] as String? ?? json['shift_date'] as String? ?? '',
       time: json['time'] as String? ?? '',
       opdService: json['opd_service'] as String? ?? '',
       serviceDetail: json['service_detail'] as String? ?? '',

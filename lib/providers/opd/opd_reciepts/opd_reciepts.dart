@@ -665,6 +665,15 @@ class OpdProvider extends ChangeNotifier {
       parsedDate = DateTime.now();
     }
 
+    // Build a List<String> from the comma-separated opd_service so the
+    // records table can display the service column identically to API records.
+    final rawService = (v['opd_service'] ?? '').toString();
+    final serviceList = rawService
+        .split(',')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+
     return {
       'srl_no': 0,
       'receipt_id': v['receipt_id'] ?? 'LOCAL',
@@ -679,8 +688,11 @@ class OpdProvider extends ChangeNotifier {
       'patient_gender': '',
       'date': parsedDate,
       'time': v['time'] ?? '',
-      'opd_service': v['opd_service'] ?? '',
-      'service_detail': v['opd_service'] ?? '',
+      'opd_service': rawService,
+      'service_detail': rawService,
+      'services': serviceList,   // ← List<String> expected by records table
+      'details': rawService,
+      'total': double.tryParse(v['total_amount']?.toString() ?? '0') ?? 0.0,
       'total_amount': double.tryParse(v['total_amount']?.toString() ?? '0') ?? 0.0,
       'discount': 0.0,
       'paid': double.tryParse(v['paid']?.toString() ?? '0') ?? 0.0,
@@ -1136,6 +1148,16 @@ class OpdProvider extends ChangeNotifier {
 
     totalDrShare = serviceDetails.fold(0.0, (sum, d) => sum + (d['drShareAmount'] as double));
 
+    // Normalize shift_date to plain YYYY-MM-DD — parity with React's
+    // new Date(currentShift.shift_date).toLocaleDateString('en-CA').
+    // The raw value may be an ISO timestamp ("2026-05-12T00:00:00.000Z")
+    // or the empty placeholder ("--"); both break React's fmtDate().
+    final rawShiftDate = currentShift?.shiftDate ?? dateStr;
+    final normalizedShiftDate =
+        (rawShiftDate.isEmpty || rawShiftDate == '--')
+            ? dateStr
+            : rawShiftDate.split('T')[0].split(' ')[0];
+
     final payload = {
       'patient_mr_number': patient.mrNo,
       'patient_name': patient.fullName,
@@ -1166,7 +1188,7 @@ class OpdProvider extends ChangeNotifier {
       'status': 'Active', 'payment_mode': 'Cash', 'receipt_type': 'Small',
       'shift_id': currentShift?.shiftId ?? 0,
       'shift_type': currentShift?.shiftType ?? 'N/A',
-      'shift_date': currentShift?.shiftDate ?? dateStr,
+      'shift_date': normalizedShiftDate,   // ← YYYY-MM-DD only, matches React
       'emergency_paid': servicesHeads.any((h) => h.toLowerCase() == 'emergency'),
       'refer_to_discount': _isReferredToDiscount,
     };
@@ -1268,7 +1290,7 @@ class OpdProvider extends ChangeNotifier {
             'patient_name': patient.fullName,
             'shift_id': currentShift?.shiftId ?? 0,
             'shift_type': currentShift?.shiftType ?? 'N/A',
-            'shift_date': currentShift?.shiftDate ?? dateStr,
+            'shift_date': normalizedShiftDate,   // ← same normalized value
           });
         }
       }

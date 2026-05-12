@@ -77,6 +77,21 @@ class PrescriptionProvider extends ChangeNotifier {
 
   List<dynamic> _consultationPatients = [];
   List<dynamic> get consultationPatients => _consultationPatients;
+  List<dynamic> get eyeConsultationPatients => _consultationPatients.where((p) {
+        final dept = (p['doctor_department'] ?? '').toString().toLowerCase();
+        final service = (p['service_detail'] ?? '').toString().toLowerCase();
+        return dept.contains('eye') || service.contains('eye');
+      }).toList();
+
+  List<dynamic> getFilteredConsultationPatients(String? department) {
+    if (department == null || department.isEmpty) return _consultationPatients;
+    final q = department.toLowerCase();
+    return _consultationPatients.where((p) {
+      final dept = (p['doctor_department'] ?? '').toString().toLowerCase();
+      final service = (p['service_detail'] ?? '').toString().toLowerCase();
+      return dept.contains(q) || service.contains(q);
+    }).toList();
+  }
 
   List<PrescriptionModel> _prescriptionHistory = [];
   List<PrescriptionModel> get prescriptionHistory => _prescriptionHistory;

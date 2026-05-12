@@ -303,18 +303,20 @@ class _CustomDrawerState extends State<CustomDrawer> {
                     ),
 
                   // Sync Dashboard
-                  _buildDrawerItem(
-                    icon: Icons.sync_rounded,
-                    title: 'Sync Dashboard',
-                    index: 100,
-                  ),
+                  if (perm.can(Perm.campDashboardRead))
+                    _buildDrawerItem(
+                      icon: Icons.sync_rounded,
+                      title: 'Sync Dashboard',
+                      index: 100,
+                    ),
 
                   // Offline Dashboard
-                  _buildDrawerItem(
-                    icon: Icons.offline_pin_rounded,
-                    title: 'Camp Dashboard',
-                    index: 101,
-                  ),
+                  if (perm.can(Perm.campDashboardRead))
+                    _buildDrawerItem(
+                      icon: Icons.offline_pin_rounded,
+                      title: 'Camp Dashboard',
+                      index: 101,
+                    ),
 
                   // ── Prescription Dropdown ──────────────────────────────────
                   if (prescriptionItems.isNotEmpty)

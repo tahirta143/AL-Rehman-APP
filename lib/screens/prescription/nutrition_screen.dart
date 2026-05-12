@@ -10,6 +10,7 @@ import '../../models/vitals_model/vitals_model.dart';
 import '../../core/services/pdf_nutrition_service.dart';
 import '../../custum widgets/custom_loader.dart';
 import '../../core/utils/wait_time_helper.dart';
+import 'widgets/shared_consultation_widgets.dart';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const kTeal = Color(0xFF00B5AD);
@@ -72,7 +73,7 @@ class _NutritionScreenState extends State<NutritionScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (isMobile) _ConsultationDropdown(provider: prescriptionProvider),
+                  if (isMobile) const SharedConsultationDropdown(),
                   if (isMobile) const SizedBox(height: 16),
                   
                   // ── Patient Info ──────────────────────────────────────────────────
@@ -157,7 +158,7 @@ class _NutritionScreenState extends State<NutritionScreen> {
             if (!isMobile)
               const Expanded(
                 flex: 3,
-                child: _ConsultationSidebar(),
+                child: SharedConsultationSidebar(),
               ),
           ],
         ),
@@ -430,188 +431,6 @@ class _SavePrintButton extends StatelessWidget {
   }
 }
 
-class _ConsultationDropdown extends StatelessWidget {
-  final PrescriptionProvider provider;
-  const _ConsultationDropdown({required this.provider});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF1F5F9), 
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: kBorder),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<dynamic>(
-          isExpanded: true,
-          hint: Row(
-            children: [
-              const Icon(Icons.people_outline, size: 18, color: kTeal),
-              const SizedBox(width: 8),
-              Text(provider.isLoadingPatients ? 'Loading patients...' : 'Select Consultation Patient', 
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: kTextDark)),
-            ],
-          ),
-          value: null,
-          onChanged: (val) => provider.selectConsultationPatient(val),
-          items: provider.consultationPatients.map((p) {
-            final waitTime = WaitTimeHelper.getWaitTime(p['date'], p['time']);
-            return DropdownMenuItem(
-              value: p,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: [
-                      Text(p['patient_name'] ?? '', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                      if (p['token_number'] != null) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: kTeal,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            '#${p['token_number']}',
-                            style: const TextStyle(fontSize: 8, fontWeight: FontWeight.w900, color: Colors.white),
-                          ),
-                        ),
-                      ],
-                      if (waitTime != null) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.amber.shade50,
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(color: Colors.amber.shade200),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.access_time, size: 8, color: Colors.amber.shade800),
-                              const SizedBox(width: 4),
-                              Text(waitTime, style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.amber.shade800)),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                  Text('MR: ${p['patient_mr_number']} | ${p['receipt_id']}', style: const TextStyle(fontSize: 10, color: kTextMid)),
-                ],
-              ),
-            );
-          }).toList(),
-        ),
-      ),
-    );
-  }
-}
-
-class _ConsultationSidebar extends StatelessWidget {
-  const _ConsultationSidebar();
-
-  @override
-  Widget build(BuildContext context) {
-    final provider = context.watch<PrescriptionProvider>();
-    return Container(
-      margin: const EdgeInsets.only(left: 16),
-      decoration: BoxDecoration(
-        color: kWhite,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: kBorder),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4)],
-      ),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(colors: [Color(0xFF00B5AD), Color(0xFF00968F)]),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.assignment_ind, color: Colors.white, size: 16),
-                const SizedBox(width: 8),
-                const Text('Consultations', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.refresh, color: Colors.white, size: 16),
-                  onPressed: () => provider.loadConsultationPatients(),
-                  constraints: const BoxConstraints(),
-                  padding: EdgeInsets.zero,
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: provider.isLoadingPatients
-                ? const CustomLoader(size: 30)
-                : provider.consultationPatients.isEmpty
-                    ? const Center(child: Text('No consultations today', style: TextStyle(fontSize: 11, color: Colors.grey)))
-                    : ListView.separated(
-                        itemCount: provider.consultationPatients.length,
-                        separatorBuilder: (_, __) => const Divider(height: 1),
-                        itemBuilder: (context, idx) {
-                          final p = provider.consultationPatients[idx];
-                          final waitTime = WaitTimeHelper.getWaitTime(p['date'], p['time']);
-                          
-                          return ListTile(
-                            dense: true,
-                            onTap: () => provider.selectConsultationPatient(p),
-                            title: Row(
-                              children: [
-                                Expanded(child: Text(p['patient_name'] ?? '', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
-                                if (p['token_number'] != null) ...[
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: Colors.indigo.shade50,
-                                      borderRadius: BorderRadius.circular(4),
-                                      border: Border.all(color: Colors.indigo.shade100),
-                                    ),
-                                    child: Text(
-                                      'T-${p['token_number']}',
-                                      style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.indigo.shade700),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                ],
-                              ],
-                            ),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(p['service_detail'] ?? '', style: const TextStyle(fontSize: 10, color: Colors.grey)),
-                                if (waitTime != null)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 2),
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.access_time, size: 10, color: Colors.amber.shade700),
-                                        const SizedBox(width: 4),
-                                        Text(waitTime, style: TextStyle(fontSize: 9, color: Colors.amber.shade800, fontWeight: FontWeight.w500)),
-                                      ],
-                                    ),
-                                  ),
-                              ],
-                            ),
-                            trailing: Text(p['patient_mr_number']?.toString() ?? '', style: const TextStyle(fontSize: 10, color: kTeal, fontWeight: FontWeight.bold)),
-                          );
-                        },
-                      ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _PatientInfoCard extends StatelessWidget {
   final bool isTablet;
