@@ -452,6 +452,16 @@ class DatabaseHelper {
     return await db.insert(table, data, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
+  Future<void> batchInsert(String table, List<Map<String, dynamic>> items) async {
+    if (items.isEmpty) return;
+    Database db = await database;
+    Batch batch = db.batch();
+    for (var item in items) {
+      batch.insert(table, item, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+    await batch.commit(noResult: true);
+  }
+
   Future<List<Map<String, dynamic>>> queryAll(String table) async {
     Database db = await database;
     return await db.query(table);

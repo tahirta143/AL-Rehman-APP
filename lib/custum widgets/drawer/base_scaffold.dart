@@ -83,6 +83,9 @@ class BaseScaffold extends StatefulWidget {
 }
 
 class _BaseScaffoldState extends State<BaseScaffold> {
+  // ✅ Static history stack to track bottom nav / drawer navigation
+  static final List<int> _navHistory = [];
+
   // ✅ Created once in State — survives every rebuild triggered by child setState()
   late final GlobalKey<ScaffoldState> _fallbackKey;
 
@@ -98,35 +101,50 @@ class _BaseScaffoldState extends State<BaseScaffold> {
   @override
   Widget build(BuildContext context) {
     return ScaffoldMessenger(
-      child: Scaffold(
-        key: _effectiveKey,
-        backgroundColor: const Color(0xFFF8F9FA),
-        extendBody: true, // Allows content to flow behind the bottom bar
-  
-        drawer: CustomDrawer(
-          selectedIndex: widget.drawerIndex,
-          onMenuItemTap: (index) {
-            Navigator.pop(context);
-            if (index != widget.drawerIndex) {
-              _navigateToScreen(context, index);
-            }
-          },
-        ),
-  
-        floatingActionButton: widget.floatingActionButton,
-        floatingActionButtonLocation: widget.floatingActionButtonLocation,
-        bottomNavigationBar: widget.bottomNavigationBar ?? _buildBottomNavBar(),
-  
-        body: Stack(
-          children: [
-            Column(
-              children: [
-                if (widget.showAppBar) _buildHeader(context, _effectiveKey),
-                Expanded(child: widget.body),
-              ],
-            ),
-            const AiChatWidget(),
-          ],
+      child: PopScope(
+        canPop: widget.drawerIndex == 21 && _navHistory.isEmpty, // Exit only if at Home and no history
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) return;
+          
+          if (_navHistory.isNotEmpty) {
+            // Go back to the previous screen in history
+            final prevIndex = _navHistory.removeLast();
+            _navigateToScreen(context, prevIndex, addToHistory: false);
+          } else if (widget.drawerIndex != 21) {
+            // If history empty but not on Home, go to Home
+            _navigateToScreen(context, 21, addToHistory: false);
+          }
+        },
+        child: Scaffold(
+          key: _effectiveKey,
+          backgroundColor: const Color(0xFFF8F9FA),
+          extendBody: true, // Allows content to flow behind the bottom bar
+    
+          drawer: CustomDrawer(
+            selectedIndex: widget.drawerIndex,
+            onMenuItemTap: (index) {
+              Navigator.pop(context);
+              if (index != widget.drawerIndex) {
+                _navigateToScreen(context, index);
+              }
+            },
+          ),
+    
+          floatingActionButton: widget.floatingActionButton,
+          floatingActionButtonLocation: widget.floatingActionButtonLocation,
+          bottomNavigationBar: widget.bottomNavigationBar ?? _buildBottomNavBar(),
+    
+          body: Stack(
+            children: [
+              Column(
+                children: [
+                  if (widget.showAppBar) _buildHeader(context, _effectiveKey),
+                  Expanded(child: widget.body),
+                ],
+              ),
+              const AiChatWidget(),
+            ],
+          ),
         ),
       ),
     );
@@ -239,7 +257,20 @@ class _BaseScaffoldState extends State<BaseScaffold> {
     );
   }
 
-  void _navigateToScreen(BuildContext context, int index) {
+  void _navigateToScreen(BuildContext context, int index, {bool addToHistory = true}) {
+    if (addToHistory && widget.drawerIndex != index) {
+      // Add current screen to history before moving
+      _navHistory.add(widget.drawerIndex);
+      
+      // Keep history manageable (last 10 screens)
+      if (_navHistory.length > 10) {
+        _navHistory.removeAt(0);
+      }
+      
+      // If we are navigating to Home, we can optionally clear history
+      // but let's keep it for now as per "one step back" requirement.
+    }
+
     Widget screen;
 
     switch (index) {

@@ -189,6 +189,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/mobile_auth_provider.dart';
+import '../../core/services/connectivity_service.dart';
 import '../../custum widgets/custom_loader.dart';
 import '../doctor/mobile_doctor_dashboard.dart';
 import '../main_shell.dart';
@@ -229,6 +230,12 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
   }
 
   Future<void> _handleLogin() async {
+    final connectivity = ConnectivityService();
+    if (!connectivity.isOnline.value) {
+      _showSnackBar('No internet connection. Please connect to continue.', isError: true);
+      return;
+    }
+
     final authProvider = context.read<MobileAuthProvider>();
     final mrNumber = _phoneController.text.trim(); // Reusing controller for MR Number
     final phone = _passwordOrOtpController.text.trim(); // Reusing for Phone Number
@@ -344,6 +351,37 @@ class _MobileLoginScreenState extends State<MobileLoginScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    ValueListenableBuilder<bool>(
+                      valueListenable: ConnectivityService().isOnline,
+                      builder: (context, isOnline, _) {
+                        if (isOnline) return const SizedBox.shrink();
+                        return Container(
+                          margin: EdgeInsets.only(bottom: screenH * 0.02),
+                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.red.shade50,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.red.shade200),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.wifi_off_rounded, color: Colors.red.shade700, size: 20),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'No internet connection',
+                                  style: TextStyle(
+                                    color: Colors.red.shade900,
+                                    fontSize: inputFontSize * 0.9,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
                     // Title
                     Text(
                       'Welcome Back',

@@ -15,7 +15,7 @@ import '../../providers/emergency_treatment_provider/emergency_provider.dart';
 import '../../providers/appointments_provider/appointments_provider.dart';
 import '../../providers/dashboard/dashboard_provider.dart';
 import '../../core/services/opd_receipt_api_service.dart';
-import '../../core/services/usb_thermal_printer_service.dart';
+import '../../core/services/thermal_printer_service.dart';
 import '../../models/opd_model/opd_receipt_model.dart';
 import 'package:intl/intl.dart';
 import '../../models/voucher_model/voucher_model.dart';
@@ -54,7 +54,7 @@ class OpdReceiptScreen extends StatefulWidget {
 class _OpdReceiptScreenState extends State<OpdReceiptScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final ScrollController _scrollController = ScrollController();
-  final UsbThermalPrinterService _usbPrinter = UsbThermalPrinterService();
+  final ThermalPrinterService _thermalPrinter = ThermalPrinterService();
 
   // ── controllers ──
   final _mrNoCtrl = TextEditingController();
@@ -107,7 +107,7 @@ class _OpdReceiptScreenState extends State<OpdReceiptScreen> {
   void _refreshAuxData({bool isGlobalOnly = false}) {
     // 1. Refresh Emergency Queue (Global)
     Provider.of<EmergencyProvider>(context, listen: false).loadQueue();
-    
+
     // 1b. Load OPD Services and Doctors (Staff only)
     final opdProv = Provider.of<OpdProvider>(context, listen: false);
     opdProv.loadOpdServices();
@@ -116,10 +116,10 @@ class _OpdReceiptScreenState extends State<OpdReceiptScreen> {
 
     if (!isGlobalOnly && _mrNoCtrl.text.isNotEmpty) {
       final mrNo = _mrNoCtrl.text;
-      
+
       // 2. Refresh Appointments/Tokens (Patient Specific)
       Provider.of<AppointmentsProvider>(context, listen: false).fetchAppointments();
-      
+
       // 2b. Sync Upward Data for Token Flow (OpdProvider integration)
       Provider.of<OpdProvider>(context, listen: false).fetchUpcomingAppointments(mrNo);
 
@@ -444,12 +444,12 @@ class _OpdReceiptScreenState extends State<OpdReceiptScreen> {
             ElevatedButton.icon(
               onPressed: () async {
                 Navigator.pop(ctx);
-                // USB Thermal printer (BC-88AC via OTG)
+                // Bluetooth / Network / USB Thermal printer
                 await _printThermalUsbReceipt(prov, patient);
                 _clearAll();
               },
-              icon: const Icon(Icons.usb_rounded, size: 18),
-              label: const Text('Print Thermal (USB)'),
+              icon: const Icon(Icons.print_rounded, size: 18), // Changed icon
+              label: const Text('Print Thermal'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.deepOrange,
                 foregroundColor: Colors.white,
@@ -499,10 +499,10 @@ class _OpdReceiptScreenState extends State<OpdReceiptScreen> {
   }
 
   Future<void> _printThermalUsbReceipt(OpdProvider prov, OpdPatient patient) async {
-    final devices = await _usbPrinter.scanUsbPrinters();
+    final devices = await _thermalPrinter.scanPrinters();
     if (!mounted) return;
     if (devices.isEmpty) {
-      _snack('No USB thermal printer found. Connect BC-88AC via OTG.', err: true);
+      _snack('No thermal printer found. Ensure Bluetooth/USB is connected.', err: true);
       return;
     }
 
@@ -514,15 +514,22 @@ class _OpdReceiptScreenState extends State<OpdReceiptScreen> {
           shrinkWrap: true,
           children: [
             const ListTile(
-              title: Text('Select USB Thermal Printer'),
-              subtitle: Text('Make sure OTG is connected'),
+              title: Text('Select Thermal Printer'),
+              subtitle: Text('Bluetooth, USB, or Network'),
             ),
-            ...devices.map((d) => ListTile(
-                  leading: const Icon(Icons.usb_rounded),
+            ...devices.map((d) {
+              IconData icon = Icons.print;
+              if (d.connectionType == PrinterConnectionType.bluetooth) icon = Icons.bluetooth;
+              if (d.connectionType == PrinterConnectionType.usb) icon = Icons.usb;
+              if (d.connectionType == PrinterConnectionType.network) icon = Icons.wifi;
+
+              return ListTile(
+                  leading: Icon(icon),
                   title: Text(d.name),
-                  subtitle: Text(d.runtimeType.toString()),
+                  subtitle: Text(d.connectionType.name.toUpperCase()),
                   onTap: () => Navigator.pop(context, d),
-                )),
+                );
+            }),
           ],
         ),
       ),
@@ -625,7 +632,7 @@ class _OpdReceiptScreenState extends State<OpdReceiptScreen> {
       ..feed(2)
       ..cut();
 
-    final ok = await _usbPrinter.printReceipt(printer: selected, ticket: ticket);
+    final ok = await _thermalPrinter.printReceipt(printer: selected, ticket: ticket);
     if (!mounted) return;
     _snack(ok ? 'Thermal print sent to printer' : 'Thermal print failed', err: !ok);
   }

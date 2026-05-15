@@ -4,6 +4,7 @@ import 'package:hims_app/core/services/api_service.dart';
 import 'package:hims_app/core/services/auth_storage_service.dart';
 import 'package:hims_app/screens/auth/sign_up.dart';
 import 'package:hims_app/screens/auth/mobile_login_screen.dart';
+import 'package:hims_app/core/services/connectivity_service.dart';
 import 'package:provider/provider.dart';
 import '../main_shell.dart';
 import '../../custum widgets/custom_loader.dart';
@@ -39,6 +40,11 @@ class _SignInScreenState extends State<SignInScreen> {
 
     if (username.isEmpty || password.isEmpty) {
       _showSnackBar('Please enter username and password', isError: true);
+      return;
+    }
+
+    if (!ConnectivityService().isOnline.value) {
+      _showSnackBar('No internet connection. Please connect to continue.', isError: true);
       return;
     }
 
@@ -161,6 +167,37 @@ class _SignInScreenState extends State<SignInScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    ValueListenableBuilder<bool>(
+                      valueListenable: ConnectivityService().isOnline,
+                      builder: (context, isOnline, _) {
+                        if (isOnline) return const SizedBox.shrink();
+                        return Container(
+                          margin: EdgeInsets.only(bottom: screenH * 0.02),
+                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.red.shade50,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.red.shade200),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.wifi_off_rounded, color: Colors.red.shade700, size: 20),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'No internet connection',
+                                  style: TextStyle(
+                                    color: Colors.red.shade900,
+                                    fontSize: inputFontSize * 0.9,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
                     // Title
                     Text(
                       'Sign in',
@@ -295,7 +332,8 @@ class _SignInScreenState extends State<SignInScreen> {
                         ),
                       ),
                     ),
-                    SizedBox(height: screenH * 0.02),
+                    // Bottom padding for iOS Home Indicator
+                    SizedBox(height: mq.padding.bottom > 0 ? mq.padding.bottom : screenH * 0.02),
                   ],
                 ),
               ),

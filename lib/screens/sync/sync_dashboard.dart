@@ -4,6 +4,7 @@ import '../../providers/sync_provider.dart';
 import '../../custum widgets/drawer/base_scaffold.dart';
 import '../../core/providers/permission_provider.dart';
 import '../../core/permissions/permission_keys.dart';
+import '../../custum widgets/custom_loader.dart';
 import 'package:animate_do/animate_do.dart';
 
 class SyncDashboardScreen extends StatelessWidget {
@@ -289,13 +290,15 @@ class _SyncDashboardBodyState extends State<_SyncDashboardBody> {
                 ElevatedButton(
                   onPressed: (isOnline && !prov.isSyncing && prov.isDeviceRegistered)
                     ? () async {
+                        _showLoadingOverlay(context);
                         await prov.bootstrap(_campIdCtrl.text);
+                        Navigator.pop(context); // Close loading overlay
+                        
                         final error = prov.lastErrorMessage;
-                        _scaffoldKey.currentState?.hideCurrentSnackBar();
                         if (error != null) {
-                          _scaffoldKey.currentState?.showSnackBar(SnackBar(content: Text(error), backgroundColor: Colors.red));
+                          _showStatusDialog(context, 'Bootstrap Failed', error, isError: true);
                         } else {
-                          _scaffoldKey.currentState?.showSnackBar(const SnackBar(content: Text('Bootstrap success!'), backgroundColor: Colors.green));
+                          _showStatusDialog(context, 'Bootstrap Success', 'Master data has been successfully downloaded.');
                         }
                       }
                     : null,
@@ -365,7 +368,16 @@ class _SyncDashboardBodyState extends State<_SyncDashboardBody> {
               ),
               ElevatedButton.icon(
                 onPressed: (isOnline && pending > 0 && !prov.isSyncing)
-                  ? () => prov.syncData()
+                  ? () async {
+                      await prov.syncData();
+                      if (!mounted) return;
+                      final error = prov.lastErrorMessage;
+                      if (error != null) {
+                        _showStatusDialog(context, 'Sync Failed', error, isError: true);
+                      } else {
+                        _showStatusDialog(context, 'Sync Success', 'All records have been synchronized.');
+                      }
+                    }
                   : null,
                 icon: prov.isSyncing 
                   ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
@@ -401,50 +413,98 @@ class _SyncDashboardBodyState extends State<_SyncDashboardBody> {
     );
   }
 
-  void _showCampPicker(BuildContext context, SyncProvider prov) async {
-    final camps = await prov.fetchAvailableCamps();
-    if (!mounted) return;
-
-    if (camps.isEmpty && prov.lastErrorMessage != null) {
-      _scaffoldKey.currentState?.showSnackBar(SnackBar(content: Text(prov.lastErrorMessage!)));
-      return;
-    }
-
+  void _showCampPicker(BuildContext context, SyncProvider prov) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.6,
-        maxChildSize: 0.9,
-        expand: false,
-        builder: (context, scrollController) => Column(
-          children: [
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Text('Available Camps', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            ),
-            Expanded(
-              child: camps.isEmpty 
-                ? const Center(child: Text('No active camps found.'))
-                : ListView.builder(
-                    controller: scrollController,
-                    itemCount: camps.length,
-                    itemBuilder: (context, index) {
-                      final camp = camps[index];
-                      return ListTile(
-                        leading: const CircleAvatar(child: Icon(Icons.pin_drop)),
-                        title: Text(camp['name'] ?? 'Unnamed Camp'),
-                        subtitle: Text(camp['location'] ?? 'Unknown Location'),
-                        onTap: () {
-                          Navigator.pop(context);
-                          _showPasswordDialog(context, prov, camp);
-                        },
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: DraggableScrollableSheet(
+          initialChildSize: 0.6,
+          maxChildSize: 0.9,
+          expand: false,
+          builder: (scrollContext, scrollController) => Column(
+            children: [
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.only(bottom: 16),
+                child: Text('Available Camps', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+              ),
+              Expanded(
+                child: FutureBuilder<List<dynamic>>(
+                  future: prov.fetchAvailableCamps(),
+                  builder: (futureContext, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CustomLoader(size: 40,color: Color(0xFF00B5AD),));
+                    }
+                    
+                    if (snapshot.hasError || (snapshot.data == null || snapshot.data!.isEmpty)) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.location_off_rounded, size: 48, color: Colors.grey.shade400),
+                            const SizedBox(height: 16),
+                            Text(
+                              prov.lastErrorMessage ?? 'No active camps found.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: Colors.grey.shade600),
+                            ),
+                          ],
+                        ),
                       );
-                    },
-                  ),
-            ),
-          ],
+                    }
+
+                    final camps = snapshot.data!;
+                    return ListView.builder(
+                      controller: scrollController,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: camps.length,
+                      itemBuilder: (listContext, index) {
+                        final camp = camps[index];
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.grey.shade200),
+                          ),
+                          child: ListTile(
+                            leading: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF00B5AD).withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(Icons.pin_drop_rounded, color: Color(0xFF00B5AD)),
+                            ),
+                            title: Text(camp['name'] ?? 'Unnamed Camp', style: const TextStyle(fontWeight: FontWeight.bold)),
+                            subtitle: Text(camp['location'] ?? 'Unknown Location'),
+                            onTap: () {
+                              Navigator.pop(sheetContext);
+                              _showPasswordDialog(context, prov, camp);
+                            },
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -456,42 +516,62 @@ class _SyncDashboardBodyState extends State<_SyncDashboardBody> {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Enter Password for ${camp['name']}'),
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Connect to ${camp['name']}'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
               controller: passCtrl,
               obscureText: true,
-              decoration: const InputDecoration(labelText: 'Camp Password'),
+              decoration: InputDecoration(
+                labelText: 'Camp Password',
+                prefixIcon: const Icon(Icons.lock_outline_rounded),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             TextField(
               controller: nameCtrl,
-              decoration: const InputDecoration(labelText: 'Device Name'),
+              decoration: InputDecoration(
+                labelText: 'Device Name',
+                prefixIcon: const Icon(Icons.devices_rounded),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
             ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () async {
               if (passCtrl.text.isEmpty) return;
+              
+              Navigator.pop(dialogContext); // Close password dialog
+              _showLoadingOverlay(context);
+              
               final success = await prov.selectCamp(
                 campId: camp['id'],
                 password: passCtrl.text,
                 deviceName: nameCtrl.text,
               );
+              
               if (!mounted) return;
+              Navigator.pop(context); // Close loading overlay (using screen context)
+              
               if (success) {
-                Navigator.pop(context);
                 _campIdCtrl.text = camp['id'];
-                _scaffoldKey.currentState?.showSnackBar(const SnackBar(content: Text('Camp selected successfully!'), backgroundColor: Colors.green));
+                _showStatusDialog(context, 'Registration Success', 'Device has been registered to ${camp['name']}');
               } else {
-                _scaffoldKey.currentState?.showSnackBar(SnackBar(content: Text(prov.lastErrorMessage ?? 'Failed to select camp'), backgroundColor: Colors.red));
+                _showStatusDialog(context, 'Registration Failed', prov.lastErrorMessage ?? 'Failed to select camp', isError: true);
               }
             },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF00B5AD),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
             child: const Text('Connect'),
           ),
         ],
@@ -500,40 +580,114 @@ class _SyncDashboardBodyState extends State<_SyncDashboardBody> {
   }
 
   void _showCreateSessionDialog(BuildContext context, SyncProvider prov) {
-    // ... Existing implementation remains mostly valid, but might need password field if backend requires it now
     final nameCtrl = TextEditingController();
     final locCtrl = TextEditingController();
     final passCtrl = TextEditingController();
+    final mrPrefixCtrl = TextEditingController();
+    final limitCtrl = TextEditingController(text: '5');
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('New Camp Session'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Camp Name')),
-            TextField(controller: locCtrl, decoration: const InputDecoration(labelText: 'Location')),
-            TextField(controller: passCtrl, decoration: const InputDecoration(labelText: 'Camp Password (Required)')),
-          ],
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameCtrl, 
+                decoration: InputDecoration(
+                  labelText: 'Camp Name *',
+                  prefixIcon: const Icon(Icons.drive_file_rename_outline_rounded),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: locCtrl, 
+                decoration: InputDecoration(
+                  labelText: 'Location',
+                  prefixIcon: const Icon(Icons.location_on_rounded),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: mrPrefixCtrl, 
+                      textCapitalization: TextCapitalization.characters,
+                      decoration: InputDecoration(
+                        labelText: 'MR Prefix',
+                        prefixIcon: const Icon(Icons.tag_rounded),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        hintText: 'e.g. CAMP1',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  SizedBox(
+                    width: 100,
+                    child: TextField(
+                      controller: limitCtrl, 
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: 'Limit *',
+                        prefixIcon: const Icon(Icons.smartphone_rounded),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: passCtrl, 
+                obscureText: true,
+                decoration: InputDecoration(
+                  labelText: 'Sync Password *',
+                  prefixIcon: const Icon(Icons.lock_outline_rounded),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  helperText: 'Required for device connection',
+                ),
+              ),
+            ],
+          ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () async {
               if (nameCtrl.text.isEmpty || passCtrl.text.isEmpty) return;
-              // Assuming createSession on backend also updated to handle password
-              // If not, this part might need adjustment in sync_provider.dart
-              final result = await prov.createSession(nameCtrl.text, locCtrl.text, passCtrl.text); 
-              // Note: backend implementation of POST /sessions might need password too.
-              // For now we just follow the UI flow.
+              
+              Navigator.pop(dialogContext); // Close dialog
+              _showLoadingOverlay(context);
+              
+              final result = await prov.createSession(
+                name: nameCtrl.text,
+                location: locCtrl.text,
+                password: passCtrl.text,
+                mrPrefix: mrPrefixCtrl.text,
+                deviceLimit: int.tryParse(limitCtrl.text) ?? 5,
+              ); 
+              
               if (!mounted) return;
+              Navigator.pop(context); // Close loading overlay
+              
               if (result['success'] == true) {
-                Navigator.pop(context);
-                _scaffoldKey.currentState?.showSnackBar(const SnackBar(content: Text('Camp created! You can now pick it from the list.'), backgroundColor: Colors.green));
+                _showStatusDialog(context, 'Camp Created', 'You can now pick "${nameCtrl.text}" from the list.');
+              } else {
+                _showStatusDialog(context, 'Creation Failed', result['message'] ?? 'Failed to create camp', isError: true);
               }
             },
-            child: const Text('Create'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF00B5AD),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Create Camp'),
           ),
         ],
       ),
@@ -544,6 +698,7 @@ class _SyncDashboardBodyState extends State<_SyncDashboardBody> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('Reset Camp Config?'),
         content: const Text('This will clear your device registration and camp configuration. Local patient data will NOT be deleted, but you will need to re-select a camp.'),
         actions: [
@@ -554,13 +709,111 @@ class _SyncDashboardBodyState extends State<_SyncDashboardBody> {
               if (mounted) {
                 Navigator.pop(context);
                 _campIdCtrl.clear();
-                _scaffoldKey.currentState?.showSnackBar(const SnackBar(content: Text('Camp configuration reset.')));
+                _showStatusDialog(context, 'Reset Successful', 'Camp configuration has been cleared.');
               }
             },
             child: const Text('Reset', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
+    );
+  }
+
+  void _showLoadingOverlay(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (loadingContext) => Center(
+        child: Consumer<SyncProvider>(
+          builder: (context, prov, child) => Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CustomLoader(size: 60),
+              if (prov.syncStatus != null) ...[
+                const SizedBox(height: 24),
+                Material(
+                  color: Colors.transparent,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    child: Text(
+                      prov.syncStatus!,
+                      style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showStatusDialog(BuildContext context, String title, String message, {bool isError = false}) {
+    showDialog(
+      context: context,
+      builder: (statusContext) {
+        // Auto dismiss after 2 seconds on success
+        if (!isError) {
+          Future.delayed(const Duration(seconds: 2), () {
+            if (Navigator.canPop(statusContext)) {
+              Navigator.pop(statusContext);
+            }
+          });
+        }
+
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: (isError ? Colors.red : const Color(0xFF00B5AD)).withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    isError ? Icons.error_outline_rounded : Icons.check_circle_outline_rounded,
+                    color: isError ? Colors.red : const Color(0xFF00B5AD),
+                    size: 40,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  title,
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+                ),
+                if (isError) ...[
+                  const SizedBox(height: 24),
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(statusContext),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size(double.infinity, 45),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text('Dismiss'),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

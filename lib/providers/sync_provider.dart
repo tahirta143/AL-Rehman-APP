@@ -25,6 +25,9 @@ class SyncProvider extends ChangeNotifier {
   String? _campId;
   String? get campId => _campId;
 
+  String? _syncStatus;
+  String? get syncStatus => _syncStatus;
+
   bool get isOnline => _connectivity.isOnline.value;
   bool get isOfflineForced => _connectivity.isManualOffline;
 
@@ -102,38 +105,52 @@ class SyncProvider extends ChangeNotifier {
   Future<void> bootstrap(String campId) async {
     _isSyncing = true;
     _lastErrorMessage = null;
+    _syncStatus = 'Downloading data...';
     notifyListeners();
     try {
-      final result = await _syncService.bootstrap(campId);
+      final result = await _syncService.bootstrap(campId, onProgress: (msg) {
+        _syncStatus = msg;
+        notifyListeners();
+      });
+      
       if (result['success'] == true) {
+        _syncStatus = 'Finalizing data...';
+        notifyListeners();
+        
         // --- Flutter-only Workaround: Hydrate missing fields ---
-        debugPrint('💧 Hydrating doctor details from standard API...');
         try {
           final doctorsResult = await _consultationApi.fetchDoctors();
           if (doctorsResult.success && doctorsResult.doctors.isNotEmpty) {
-            int count = 0;
+            _syncStatus = 'Updating doctor profiles...';
+            notifyListeners();
+            
+            final db = await _db.database;
+            final batch = db.batch();
             for (var doc in doctorsResult.doctors) {
-              final updated = await _db.updateDoctorDetails(
-                srlNo: doc.srlNo,
-                timings: doc.consultationTimings,
-                fee: doc.consultationFee,
-                days: doc.availableDays,
-                hospital: doc.hospitalName,
-                imageUrl: doc.imageUrl ?? '',
+              batch.update(
+                'master_doctors',
+                {
+                  'doctor_timings': doc.consultationTimings,
+                  'consultation_fee': doc.consultationFee,
+                  'follow_up_fee': ((double.tryParse(doc.consultationFee) ?? 0) * 0.7).floor().toString(),
+                  'available_days': doc.availableDays,
+                  'hospital_name': doc.hospitalName,
+                  'image_url': doc.imageUrl ?? '',
+                },
+                where: 'srl_no = ?',
+                whereArgs: [doc.srlNo],
               );
-              if (updated > 0) count++;
-              debugPrint('👨‍⚕️ Hydrated Dr. ${doc.doctorName}: fee=${doc.consultationFee}, timings=${doc.consultationTimings}');
             }
-            debugPrint('✅ Doctors hydrated with full details: $count doctors');
-          } else {
-            debugPrint('⚠️ Hydration failed: ${doctorsResult.message}');
+            await batch.commit(noResult: true);
           }
         } catch (e) {
           debugPrint('❌ Hydration error: $e');
         }
+        _syncStatus = null;
         notifyListeners();
       } else {
         _lastErrorMessage = result['message'];
+        _syncStatus = null;
         if (result['isCampRemoved'] == true) {
           await resetCamp();
           _lastErrorMessage = 'Camp removed from admin. Local session reset.';
@@ -141,15 +158,16 @@ class SyncProvider extends ChangeNotifier {
       }
     } catch (e) {
       _lastErrorMessage = e.toString();
+      _syncStatus = null;
     } finally {
       _isSyncing = false;
+      _syncStatus = null;
       notifyListeners();
     }
   }
 
   Future<List<dynamic>> fetchAvailableCamps() async {
     _lastErrorMessage = null;
-    notifyListeners();
     try {
       final result = await _syncService.fetchAvailableCamps();
       if (result['success'] == true) {
@@ -161,8 +179,6 @@ class SyncProvider extends ChangeNotifier {
     } catch (e) {
       _lastErrorMessage = e.toString();
       return [];
-    } finally {
-      notifyListeners();
     }
   }
 
@@ -206,12 +222,24 @@ class SyncProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<Map<String, dynamic>> createSession(String name, String location, String password) async {
+  Future<Map<String, dynamic>> createSession({
+    required String name,
+    required String location,
+    required String password,
+    required String mrPrefix,
+    required int deviceLimit,
+  }) async {
     _isSyncing = true;
     _lastErrorMessage = null;
     notifyListeners();
     try {
-      final result = await _syncService.createSession(name: name, location: location, password: password);
+      final result = await _syncService.createSession(
+        name: name,
+        location: location,
+        password: password,
+        mrPrefix: mrPrefix,
+        deviceLimit: deviceLimit,
+      );
       if (result['success'] != true) {
         _lastErrorMessage = result['message'];
       }

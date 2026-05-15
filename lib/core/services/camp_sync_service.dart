@@ -42,7 +42,7 @@ class CampSyncService {
 
 
   // ─── Bootstrap Master Data ───────────────────────────────────────
-  Future<Map<String, dynamic>> bootstrap(String campId) async {
+  Future<Map<String, dynamic>> bootstrap(String campId, {Function(String)? onProgress}) async {
     try {
       final headers = await _campHeaders();
       final url = '${GlobalApi.baseUrl}/camp-sync/bootstrap/$campId';
@@ -71,8 +71,10 @@ class CampSyncService {
           await _db.clearTable('master_services');
 
           if (payload['doctors'] != null) {
+            onProgress?.call('Saving doctors...');
+            final List<Map<String, dynamic>> doctors = [];
             for (var doc in payload['doctors']) {
-              await _db.insert('master_doctors', {
+              doctors.add({
                 'srl_no': doc['srl_no'],
                 'doctor_id': doc['doctor_id'],
                 'doctor_name': doc['doctor_name'],
@@ -87,11 +89,14 @@ class CampSyncService {
                 'is_active': doc['is_active'],
               });
             }
+            await _db.batchInsert('master_doctors', doctors);
           }
 
           if (payload['services'] != null) {
+            onProgress?.call('Saving services...');
+            final List<Map<String, dynamic>> services = [];
             for (var svc in payload['services']) {
-              await _db.insert('master_services', {
+              services.add({
                 'srl_no': svc['srl_no'],
                 'service_id': svc['service_id'],
                 'service_name': svc['service_name'],
@@ -100,22 +105,27 @@ class CampSyncService {
                 'is_active': svc['is_active'],
               });
             }
+            await _db.batchInsert('master_services', services);
           }
 
           if (payload['medicines'] != null) {
+            onProgress?.call('Saving medicines...');
             await _db.clearTable('master_medicines');
+            final List<Map<String, dynamic>> medicines = [];
             for (var med in payload['medicines']) {
-              await _db.insert('master_medicines', {
+              medicines.add({
                 'id': med['id'],
                 'name': med['medicine_name'],
                 'is_formula': med['formula'] == 1 ? 1 : 0,
               });
             }
+            await _db.batchInsert('master_medicines', medicines);
           }
 
           // Support both 'diagnosisQuestions' and 'diagnosis_catalog' key names
           final diagnosisRaw = payload['diagnosisQuestions'] ?? payload['diagnosis_catalog'];
           if (diagnosisRaw != null) {
+            onProgress?.call('Saving diagnosis questions...');
             await _db.clearTable('master_diagnosis');
             
             List<dynamic> diagList = [];
@@ -123,7 +133,6 @@ class CampSyncService {
               diagList = diagnosisRaw;
             } else if (diagnosisRaw is Map) {
               if (diagnosisRaw.containsKey('questions') && diagnosisRaw.containsKey('options')) {
-                // Backend format: { questions: [...], options: [...] }
                 final List<dynamic> questions = diagnosisRaw['questions'] ?? [];
                 final List<dynamic> options = diagnosisRaw['options'] ?? [];
                 
@@ -137,7 +146,6 @@ class CampSyncService {
                   });
                 }
               } else {
-                // Category format: { "General": [...], "Eye": [...] }
                 diagnosisRaw.forEach((category, questions) {
                   if (questions is List) {
                     for (var q in questions) {
@@ -150,7 +158,7 @@ class CampSyncService {
               }
             }
 
-            debugPrint('💊 Saving ${diagList.length} diagnosis questions');
+            final List<Map<String, dynamic>> diagnosis = [];
             for (var dq in diagList) {
               final questionText = dq['question_text'] ?? dq['question'] ?? dq['title'] ?? '';
               final rawOptions = dq['options'] ?? dq['choices'] ?? [];
@@ -163,7 +171,7 @@ class CampSyncService {
               } catch (_) {
                 optionsJson = '[]';
               }
-              await _db.insert('master_diagnosis', {
+              diagnosis.add({
                 'id': dq['id'],
                 'question': questionText,
                 'options_json': optionsJson,
@@ -171,19 +179,16 @@ class CampSyncService {
                 'question_type': questionType,
               });
             }
-          } else {
-            debugPrint('⚠️ Bootstrap: diagnosis_catalog missing from payload');
+            await _db.batchInsert('master_diagnosis', diagnosis);
           }
 
           if (payload['investigations'] != null) {
+            onProgress?.call('Saving investigations...');
             await _db.clearTable('master_investigations');
             final invList = payload['investigations'] as List;
-            debugPrint('🔬 Saving ${invList.length} investigations');
-            if (invList.isNotEmpty) {
-              debugPrint('🔬 First investigation keys: ${invList.first.keys.toList()}, sample: ${invList.first}');
-            }
+            final List<Map<String, dynamic>> investigations = [];
             for (var inv in invList) {
-              await _db.insert('master_investigations', {
+              investigations.add({
                 'srl_no': inv['srl_no'] ?? inv['id'],
                 'test_id': inv['test_id']?.toString() ?? inv['id']?.toString(),
                 'test_name': inv['test_name'],
@@ -191,17 +196,21 @@ class CampSyncService {
                 'test_type': inv['test_type'] ?? inv['investigation_type'],
               });
             }
+            await _db.batchInsert('master_investigations', investigations);
           }
 
           if (payload['eyeSetup'] != null) {
+            onProgress?.call('Saving eye setup...');
             await _db.clearTable('master_eye_setup');
+            final List<Map<String, dynamic>> eyeSetup = [];
             for (var item in payload['eyeSetup']) {
-              await _db.insert('master_eye_setup', {
+              eyeSetup.add({
                 'id': item['id'],
                 'item_name': item['item_name'],
                 'item_type': item['item_type'],
               });
             }
+            await _db.batchInsert('master_eye_setup', eyeSetup);
           }
 
           // Update config
@@ -213,7 +222,7 @@ class CampSyncService {
           });
 
           // Fetch and cache full diagnosis questions (with options) from live API
-          await _fetchAndCacheDiagnosisQuestions(headers, ['General', 'Eye']);
+          await _fetchAndCacheDiagnosisQuestions(headers, ['General', 'Eye'], onProgress: onProgress);
 
           return {'success': true, 'message': 'Master data updated successfully'};
         }
@@ -231,7 +240,7 @@ class CampSyncService {
   }
 
   // ─── Fetch & Cache Diagnosis Questions ───────────────────────────
-  Future<void> _fetchAndCacheDiagnosisQuestions(Map<String, String> headers, List<String> departments) async {
+  Future<void> _fetchAndCacheDiagnosisQuestions(Map<String, String> headers, List<String> departments, {Function(String)? onProgress}) async {
     for (final dept in departments) {
       try {
         final url = '${GlobalApi.baseUrl}/diagnosis/questions/department/${Uri.encodeComponent(dept)}';
@@ -242,10 +251,12 @@ class CampSyncService {
           if (data['success'] == true) {
             final questions = data['data'] as List? ?? [];
             if (questions.isNotEmpty) {
-              // Delete old cached entries for this department
+              onProgress?.call('Caching $dept diagnosis...');
               final db = await _db.database;
               await db.delete('master_diagnosis',
                   where: 'LOWER(category) = ?', whereArgs: [dept.toLowerCase()]);
+              
+              final List<Map<String, dynamic>> batch = [];
               for (var q in questions) {
                 String optionsJson;
                 try {
@@ -253,15 +264,15 @@ class CampSyncService {
                 } catch (_) {
                   optionsJson = '[]';
                 }
-                await _db.insert('master_diagnosis', {
+                batch.add({
                   'id': q['id'],
                   'question': q['question_text'] ?? q['question'] ?? '',
                   'options_json': optionsJson,
-                  'category': dept, // Store with the department name we queried
+                  'category': dept,
                   'question_type': q['question_mode'] ?? q['question_type'] ?? 'choice',
                 });
               }
-              debugPrint('💾 Bootstrap cached ${questions.length} diagnosis questions for $dept');
+              await _db.batchInsert('master_diagnosis', batch);
             }
           }
         }
@@ -312,6 +323,10 @@ class CampSyncService {
   }) async {
     try {
       final url = '${GlobalApi.baseUrl}/camp-sync/select-camp';
+      if (campId.isEmpty) {
+        return {'success': false, 'message': 'Camp ID is missing.'};
+      }
+
       final body = {
         'camp_id': campId,
         'password': password,
@@ -319,14 +334,20 @@ class CampSyncService {
         'device_identifier': deviceIdentifier,
       };
 
+      debugPrint('🚀 Selecting camp payload: ${jsonEncode(body)}');
+
       debugPrint('🚀 Selecting camp at: $url');
+      final headers = await _authHeaders();
       final response = await http.post(
         Uri.parse(url),
-        headers: {'Content-Type': 'application/json'},
+        headers: headers,
         body: jsonEncode(body),
       ).timeout(const Duration(seconds: 15));
 
       debugPrint('📥 Select Camp Response [${response.statusCode}]');
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        debugPrint('📥 Error Body: ${response.body}');
+      }
       final data = jsonDecode(response.body);
       
       if ((response.statusCode == 200 || response.statusCode == 201) && data['success'] == true) {
@@ -376,6 +397,8 @@ class CampSyncService {
     required String name,
     required String location,
     required String password,
+    required String mrPrefix,
+    required int deviceLimit,
   }) async {
     try {
       final headers = await _authHeaders();
@@ -385,8 +408,9 @@ class CampSyncService {
         'name': name,
         'location': location,
         'password': password,
+        'mr_prefix': mrPrefix,
+        'device_limit': deviceLimit,
         'status': 'active',
-        'device_limit': 5,
       };
 
       debugPrint('🚀 Creating session at: $url');
