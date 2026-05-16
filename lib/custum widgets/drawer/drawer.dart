@@ -66,48 +66,44 @@ class _CustomDrawerState extends State<CustomDrawer> {
 
     // ── Visible OPD sub-items based on permissions ──────────────────────────
     final List<_DrawerItemData> opdItems = [
-      if (perm.canAny([Perm.opdReceiptRead, Perm.opdReceiptCreate]))
+      if (perm.hasResource('OPD.RECEIPT'))
         const _DrawerItemData(
           icon: Icons.receipt_rounded,
           title: 'OPD Receipt',
           index: 3,
         ),
-      if (perm.canAny([Perm.opdPatientRead, Perm.apptRead]))
+      if (perm.hasResource('APPOINTMENTS.APPOINTMENT'))
         const _DrawerItemData(
           icon: Icons.chat_bubble_outline_rounded,
           title: 'Consultation Appointment',
           index: 1,
         ),
 
-      if (perm.can(Perm.opdPatientRead))
+      if (perm.hasResource('OPD.PATIENT'))
         const _DrawerItemData(
           icon: Icons.folder_shared_rounded,
           title: 'OPD Records',
           index: 4,
         ),
-      if (perm.canAny([Perm.consultantRead, Perm.consultantCreate]))
+      if (perm.hasResource('CONSULTANT.PAYMENT'))
         const _DrawerItemData(
           icon: Icons.payment_rounded,
           title: 'Consultation Payments',
           index: 6,
         ),
-      if (perm.canAny([Perm.expenseRead, Perm.expenseCreate]))
+      if (perm.hasResource('EXPENSES.EXPENSE'))
         const _DrawerItemData(
           icon: Icons.money_rounded,
           title: 'Add Expenses',
           index: 2,
         ),
-      if (perm.canAny([
-        Perm.opdShiftRead,
-        Perm.opdShiftCreate,
-        Perm.opdShiftCashRead,
-      ]))
+      if (perm.hasResource('OPD.SHIFT'))
         const _DrawerItemData(
           icon: Icons.filter_tilt_shift,
           title: 'Shift Management',
           index: 7,
         ),
-      if (perm.canAny([Perm.opdReceiptRead, Perm.setupDiscountTypeRead]))
+      if (perm.hasResource('OPD.DISCOUNT_APPROVAL'))
         const _DrawerItemData(
           icon: Icons.discount_outlined,
           title: 'Discount Voucher',
@@ -117,7 +113,7 @@ class _CustomDrawerState extends State<CustomDrawer> {
 
     // ── Visible Reports sub-items ────────────────────────────────────────────
     final List<_DrawerItemData> reportItems = [
-      if (perm.canAny([Perm.apptRead]))
+      if (perm.hasResource('OPD.REPORTS'))
         const _DrawerItemData(
           icon: Icons.timelapse_outlined,
           title: 'Appointment Reports',
@@ -127,7 +123,7 @@ class _CustomDrawerState extends State<CustomDrawer> {
 
     // ── Visible Prescription sub-items ───────────────────────────────────────
     final List<_DrawerItemData> prescriptionItems = [
-      if (perm.canAny([Perm.prescriptionRead, Perm.prescriptionCreate]))
+      if (perm.hasResource('PRESCRIPTION.GP_RECORD'))
         const _DrawerItemData(
           icon: Icons.medical_services_outlined,
           title: 'Prescription GP',
@@ -155,25 +151,26 @@ class _CustomDrawerState extends State<CustomDrawer> {
           title: 'Eye Prescription',
           index: 12,
         ),
-      if (perm.canAny([Perm.prescriptionRead, Perm.prescriptionCreate]))
+      // FIX: each sub-screen uses its own specific permission key (matches React)
+      if (perm.canAny([Perm.vitalsRead, Perm.vitalsCreate]))
         const _DrawerItemData(
           icon: Icons.monitor_heart_outlined,
           title: 'Vitals',
           index: 13,
         ),
-      if (perm.canAny([Perm.prescriptionRead, Perm.prescriptionCreate]))
+      if (perm.canAny([Perm.labValuesRead, Perm.labValuesCreate]))
         const _DrawerItemData(
           icon: Icons.biotech_outlined,
           title: 'Lab Values',
           index: 14,
         ),
-      if (perm.canAny([Perm.prescriptionRead, Perm.prescriptionCreate]))
+      if (perm.canAny([Perm.nutritionistRead, Perm.nutritionistCreate]))
         const _DrawerItemData(
           icon: Icons.restaurant_menu_outlined,
           title: 'Nutritionist',
           index: 15,
         ),
-      if (perm.canAny([Perm.prescriptionRead, Perm.prescriptionCreate]))
+      if (perm.canAny([Perm.fundusRead, Perm.fundusCreate]))
         const _DrawerItemData(
           icon: Icons.visibility_outlined,
           title: 'Fundus Examination',
@@ -244,20 +241,24 @@ class _CustomDrawerState extends State<CustomDrawer> {
                   if (perm.role != null)
                     Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 2,
+                        horizontal: 10,
+                        vertical: 3,
                       ),
-                      margin: const EdgeInsets.only(bottom: 4),
+                      margin: const EdgeInsets.only(bottom: 6),
                       decoration: BoxDecoration(
-                        color: Colors.white24,
+                        color: Colors.white.withOpacity(0.15),
                         borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.white.withOpacity(0.1)),
                       ),
                       child: Text(
-                        '⭐ ${perm.role}',
+                        perm.groups.isNotEmpty 
+                          ? '⭐ ${perm.role} • ${perm.groups.first['name']}'
+                          : '⭐ ${perm.role}',
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.3,
                         ),
                       ),
                     ),
@@ -288,18 +289,26 @@ class _CustomDrawerState extends State<CustomDrawer> {
                     title: 'Home',
                     index: 21,
                   ),
-                  // Dashboard — always visible
-                  _buildDrawerItem(
-                    icon: Icons.dashboard_rounded,
-                    title: 'Dashboard',
-                    index: 0,
-                  ),
+                  // FIX: Dashboard requires APP.DASHBOARD.READ (matches React)
+                  if (perm.can(Perm.appDashboardRead))
+                    _buildDrawerItem(
+                      icon: Icons.dashboard_rounded,
+                      title: 'Dashboard',
+                      index: 0,
+                    ),
                   // MR Details — standalone
                   if (perm.canAny([Perm.mrRead, Perm.mrCreate]))
                     _buildDrawerItem(
                       icon: Icons.person_outline_rounded,
                       title: 'MR Details',
                       index: 8,
+                    ),
+                  // MR View — standalone
+                  if (perm.hasResource('MR.DATA_VIEW'))
+                    _buildDrawerItem(
+                      icon: Icons.visibility_outlined,
+                      title: 'MR View',
+                      index: 22,
                     ),
 
                   // Sync Dashboard
@@ -391,14 +400,6 @@ class _CustomDrawerState extends State<CustomDrawer> {
                       title: 'Emergency Treatment',
                       index: 5,
                     ),
-
-                  // MR View — standalone
-                  // if (perm.can(Perm.mrRead))
-                  //   _buildDrawerItem(
-                  //     icon: Icons.visibility_outlined,
-                  //     title: 'MR View',
-                  //     index: 9,
-                  //   ),
 
                   // ── Reports Dropdown ───────────────────────────────────────
                   if (reportItems.isNotEmpty)

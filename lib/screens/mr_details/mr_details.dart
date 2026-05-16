@@ -103,6 +103,7 @@ class _MrDetailsBodyState extends State<_MrDetailsBody>
   List<PatientModel> _searchResults = [];
   bool _isSearching = false;
   Timer? _debounce;
+  String _lastSyncedPhone = '';
 
   // Form dropdown states
   String _relation = 'Parent';
@@ -125,11 +126,13 @@ class _MrDetailsBodyState extends State<_MrDetailsBody>
     // Always fetch latest MR on entry
     context.read<MrProvider>().fetchNextMR();
 
-    // Auto-sync Phone to WhatsApp
+    // Auto-sync Phone to WhatsApp (Follows if WhatsApp hasn't been manually changed)
+    _lastSyncedPhone = _phoneCtrl.text;
     _phoneCtrl.addListener(() {
-      if (_whatsappCtrl.text.isEmpty || _whatsappCtrl.text == _phoneCtrl.text) {
+      if (_whatsappCtrl.text == _lastSyncedPhone) {
         _whatsappCtrl.text = _phoneCtrl.text;
       }
+      _lastSyncedPhone = _phoneCtrl.text;
     });
 
     // Auto-populate when ready
@@ -305,6 +308,7 @@ class _MrDetailsBodyState extends State<_MrDetailsBody>
     _cnicCtrl.text = p.cnic;
     _addrCtrl.text = p.address;
     _cityCtrl.text = p.city;
+    _lastSyncedPhone = p.phoneNumber;
     
     if (p.dateOfBirth.isNotEmpty) {
       try {
@@ -338,6 +342,7 @@ class _MrDetailsBodyState extends State<_MrDetailsBody>
     _cnicCtrl.clear();
     _addrCtrl.clear();
     _cityCtrl.clear();
+    _lastSyncedPhone = '';
     _dob = null;
     _relation = 'Parent';
     _gender = 'Male';

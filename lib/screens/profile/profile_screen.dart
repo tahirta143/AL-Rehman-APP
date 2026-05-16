@@ -448,7 +448,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       delay: const Duration(milliseconds: 100),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
@@ -458,67 +457,107 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: Colors.teal.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
-                  child: const Icon(Icons.security, color: Colors.teal, size: 20),
-                ),
-                const SizedBox(width: 12),
-                const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Groups', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: kTextDark)),
-                    Text('Assigned permissions', style: TextStyle(fontSize: 11, color: kTextMid)),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            if (role == 'admin')
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: Colors.amber.withOpacity(0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.amber.withOpacity(0.3))),
-                child: const Row(
-                  children: [
-                    Icon(Icons.check_circle, color: Colors.amber, size: 20),
-                    SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('System Administrator', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF92400E))),
-                        Text('Full access to all modules', style: TextStyle(fontSize: 11, color: Color(0xFFB45309))),
-                      ],
+            // Header matching React emerald-50/emerald-600 style
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFECFDF5), // emerald-50
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                  ],
-                ),
-              )
-            else if (groups.isNotEmpty)
-              ...groups.map((g) => Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E8F0))),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(color: kTeal.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-                          child: const Icon(Icons.shield_outlined, color: kTeal, size: 16),
+                    child: const Icon(Icons.security_rounded, color: Color(0xFF059669), size: 22), // emerald-600
+                  ),
+                  const SizedBox(width: 12),
+                  const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Groups', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: kTextDark)),
+                      Text('Assigned permission groups', style: TextStyle(fontSize: 11, color: kTextMid)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1, color: Color(0xFFEDF2F7)),
+            
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  if (role == 'admin')
+                    // System Admin block matching React amber-50 style
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFFBEB), // amber-50
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFFDE68A)), // amber-200
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.check_circle_rounded, color: Color(0xFFD97706), size: 22), // amber-600
+                          SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('System Administrator', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF92400E))),
+                                Text('Full access to all modules', style: TextStyle(fontSize: 11, color: Color(0xFFB45309))),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else if (groups.isNotEmpty)
+                    ...groups.map((g) {
+                      final name = g['name'] ?? 'Group';
+                      final code = g['code'] ?? 'CODE';
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC), // slate-50
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFE2E8F0)), // slate-200
                         ),
-                        const SizedBox(width: 12),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        child: Row(
                           children: [
-                            Text(g['name'] ?? 'Group', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: kTextDark)),
-                            Text(g['code'] ?? 'CODE', style: const TextStyle(fontSize: 10, fontFamily: 'monospace', color: kTextMid)),
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFDBEAFE), // blue-100
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(Icons.shield_rounded, color: Color(0xFF2563EB), size: 18), // blue-600
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0F172A))), // slate-900
+                                  Text(code, style: const TextStyle(fontSize: 10, fontFamily: 'monospace', color: Color(0xFF64748B))), // slate-500
+                                ],
+                              ),
+                            ),
                           ],
                         ),
-                      ],
+                      );
+                    })
+                  else
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 20),
+                        child: Text('No groups assigned', style: TextStyle(color: kTextMid)),
+                      ),
                     ),
-                  ))
-            else
-              const Center(child: Padding(padding: EdgeInsets.all(16), child: Text('No groups assigned', style: TextStyle(color: kTextMid)))),
+                ],
+              ),
+            ),
           ],
         ),
       ),

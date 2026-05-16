@@ -29,6 +29,7 @@ import 'drawer.dart';
 import '../../custum widgets/ai_chat_widget.dart';
 import '../../custum widgets/sync_indicator.dart';
 import '../../screens/sync/sync_dashboard.dart';
+import '../../screens/mr_details/mr_view/mr_view.dart';
 
 // ─── FIX: Convert BaseScaffold from StatelessWidget to StatefulWidget ─────────
 //
@@ -339,6 +340,9 @@ class _BaseScaffoldState extends State<BaseScaffold> {
         break;
       case 21:
         screen = const landing.HomeScreen();
+        break;
+      case 22:
+        screen = const MrDataViewScreen();
         break;
       case 100:
         screen = const SyncDashboardScreen();

@@ -66,6 +66,7 @@ class _SignInScreenState extends State<SignInScreen> {
         username: loginResult.username!,
         fullName: loginResult.fullName ?? '',
         role:     loginResult.role ?? 'staff',
+        groups:   loginResult.groups,
       );
 
       // Step 3: Fetch & cache permissions

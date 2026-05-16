@@ -14,23 +14,27 @@ class PermissionProvider extends ChangeNotifier {
   String? _error;
   String? _fullName;
   String? _role;
+  List<dynamic> _groups = [];
 
   bool    get isLoading => _isLoading;
   String? get error     => _error;
   bool    get isAdmin   => _service.isAdmin;
   String? get fullName  => _fullName;
   String? get role      => _role;
+  List<dynamic> get groups => _groups;
 
   // ─── Permission check helpers ────────────────────────────────────
   bool can(String key)           => _service.can(key);
   bool canAny(List<String> keys) => _service.canAny(keys);
   bool canAll(List<String> keys) => _service.canAll(keys);
+  bool hasResource(String prefix) => _service.hasResource(prefix);
 
   // ─── Load from secure storage (offline/startup) ───────────────────
   Future<void> loadFromStorage() async {
     final perms = await _storage.getPermissions();
     _fullName = await _storage.getFullName();
     _role = await _storage.getRole();
+    _groups = await _storage.getGroups();
     _service.updatePermissions(perms);
     notifyListeners();
   }
@@ -58,9 +62,10 @@ class PermissionProvider extends ChangeNotifier {
       // Always update the in-memory service with the latest permissions from server
       _service.updatePermissions(result.permissions);
       
-      // Update local name and role
+      // Update local name, role and groups
       _fullName = await _storage.getFullName();
       _role = await _storage.getRole();
+      _groups = await _storage.getGroups();
 
       // Save to storage only if version changed or first load
       if (localVersion == 0 || serverVersion != localVersion) {
@@ -84,6 +89,7 @@ class PermissionProvider extends ChangeNotifier {
     _error = null;
     _fullName = null;
     _role = null;
+    _groups = [];
     notifyListeners();
   }
 }

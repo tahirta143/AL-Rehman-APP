@@ -34,5 +34,13 @@ class PermissionService {
 
   bool get hasAnyPermission => _permissions.isNotEmpty;
 
+  /// Returns true if user has ANY permission for the given resource.
+  /// e.g. hasResource('MR.DATA_VIEW') returns true if user has 'MR.DATA_VIEW.READ' or 'MR.DATA_VIEW.PRINT'.
+  bool hasResource(String resourcePrefix) {
+    if (_permissions.contains('*')) return true;
+    final prefix = resourcePrefix.endsWith('.') ? resourcePrefix : '$resourcePrefix.';
+    return _permissions.any((p) => p.startsWith(prefix));
+  }
+
   void clear() => _permissions = {};
 }

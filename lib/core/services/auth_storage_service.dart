@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 /// Handles all secure persistent storage for auth tokens, user info,
@@ -28,6 +29,7 @@ class AuthStorageService {
   static const _keyRole        = 'role';
   static const _keyPermissions = 'permissions';
   static const _keyPermVersion = 'permissions_version';
+  static const _keyGroups      = 'user_groups';
   static const _keyCampToken    = 'camp_device_token';
 
   // ─── Save after login ───────────────────────────────────────────────
@@ -37,6 +39,7 @@ class AuthStorageService {
     required String username,
     required String fullName,
     required String role,
+    List<dynamic>? groups,
   }) async {
     try {
       await Future.wait([
@@ -45,6 +48,7 @@ class AuthStorageService {
         _storage.write(key: _keyUsername, value: username),
         _storage.write(key: _keyFullName, value: fullName),
         _storage.write(key: _keyRole,     value: role),
+        if (groups != null) _storage.write(key: _keyGroups, value: jsonEncode(groups)),
       ]);
     } catch (e) {
       print('🔒 AuthStorage Save Error: $e');
@@ -68,6 +72,16 @@ class AuthStorageService {
   Future<String?> getUsername() => _safeRead(_keyUsername);
   Future<String?> getFullName() => _safeRead(_keyFullName);
   Future<String?> getCampToken() => _safeRead(_keyCampToken);
+
+  Future<List<dynamic>> getGroups() async {
+    final raw = await _safeRead(_keyGroups);
+    if (raw == null || raw.isEmpty) return [];
+    try {
+      return jsonDecode(raw) as List;
+    } catch (e) {
+      return [];
+    }
+  }
 
   Future<void> saveCampToken(String token) async {
     await _storage.write(key: _keyCampToken, value: token);

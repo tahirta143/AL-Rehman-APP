@@ -73,17 +73,31 @@ class _HomeBody extends StatelessWidget {
       const _NavCard(label: "OPD Receipt", desc: "Create new receipts", icon: Icons.receipt_rounded, drawerIndex: 3, permission: Perm.opdReceiptRead),
       const _NavCard(label: "Patient Records", desc: "View & manage records", icon: Icons.description_outlined, drawerIndex: 4, permission: Perm.opdPatientRead),
       const _NavCard(label: "MR Details", desc: "Patient master records", icon: Icons.person_outline_rounded, drawerIndex: 8, permission: Perm.mrRead),
+      const _NavCard(label: "MR View", desc: "Search patient database", icon: Icons.manage_search_rounded, drawerIndex: 22, permission: Perm.mrDataViewRead),
       const _NavCard(label: "Appointments", desc: "Consultant scheduling", icon: Icons.calendar_today_rounded, drawerIndex: 1, permission: Perm.apptRead),
       const _NavCard(label: "Prescription", desc: "Consultation notes", icon: Icons.medication_outlined, drawerIndex: 9, permission: Perm.prescriptionRead),
       const _NavCard(label: "Consultant Pay", desc: "Doctor payouts", icon: Icons.attach_money_rounded, drawerIndex: 6, permission: Perm.consultantRead),
       const _NavCard(label: "Add Expenses", desc: "Record expenses", icon: Icons.credit_card_rounded, drawerIndex: 2, permission: Perm.expenseRead),
       const _NavCard(label: "Shift Mgmt", desc: "Open/Close shifts", icon: Icons.access_time_rounded, drawerIndex: 7, permission: Perm.opdShiftRead),
-      const _NavCard(label: "Eye Prescription", desc: "eye workflow", icon: Icons.remove_red_eye_outlined, drawerIndex: 12, anyOf: [Perm.eyeRecordRead, Perm.eyeRecordUpdate]),
+      const _NavCard(
+        label: "Eye Prescription", 
+        desc: "eye workflow", 
+        icon: Icons.remove_red_eye_outlined, 
+        drawerIndex: 12, 
+        permission: Perm.eyeRecordRead,
+      ),
       const _NavCard(label: "Camp Sync", desc: "Camp & data sync", icon: Icons.sync_rounded, drawerIndex: 100, permission: Perm.campDashboardRead),
     ];
 
     final accessibleCards = allCards.where((c) {
-      if (c.permission != null) return perm.can(c.permission!);
+      if (c.permission != null) {
+        // If it's a .READ permission, check if user has ANY permission for that resource (React behavior)
+        if (c.permission!.endsWith('.READ')) {
+          final resource = c.permission!.substring(0, c.permission!.length - 5);
+          return perm.hasResource(resource);
+        }
+        return perm.can(c.permission!);
+      }
       if (c.anyOf != null) return perm.canAny(c.anyOf!);
       return true;
     }).toList();
@@ -169,14 +183,14 @@ class _HomeBody extends StatelessWidget {
             top: 0,
             left: 0,
             right: 0,
-            child: _buildHeroHeader(context, size, user, role, accessibleCards.length),
+            child: _buildHeroHeader(context, size, user, role, perm.groups, accessibleCards.length),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildHeroHeader(BuildContext context, Size size, String user, String role, int modulesCount) {
+  Widget _buildHeroHeader(BuildContext context, Size size, String user, String role, List<dynamic> groups, int modulesCount) {
     final tp = MediaQuery.of(context).padding.top;
     final headerHeight = size.height * 0.42; // Dynamic height for half screen effect
 
@@ -353,6 +367,33 @@ class _HomeBody extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
+              const SizedBox(height: 10),
+              // User Groups Tags
+              if (groups.isNotEmpty)
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: groups.take(3).map((g) {
+                      return Container(
+                        margin: const EdgeInsets.only(right: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.white.withOpacity(0.1)),
+                        ),
+                        child: Text(
+                          g['name'] ?? 'Group',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
               const SizedBox(height: 12),
               Row(
                 children: [

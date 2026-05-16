@@ -12,6 +12,7 @@ class LoginResult {
   final String? username;
   final String? fullName;
   final String? role;
+  final List<dynamic>? groups;
   final String? message;
 
   LoginResult({
@@ -21,6 +22,7 @@ class LoginResult {
     this.username,
     this.fullName,
     this.role,
+    this.groups,
     this.message,
   });
 }
@@ -81,6 +83,7 @@ class ApiService {
           username: data['username'] as String?,
           fullName: data['full_name'] as String?,
           role:     data['role'] as String?,
+          groups:   data['groups'] as List?,
         );
       }
 

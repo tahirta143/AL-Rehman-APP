@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../models/consultation_model/doctor_model.dart';
@@ -34,6 +35,7 @@ class _AppointmentDialogState extends State<AppointmentDialog> {
   bool _isFirstVisit = true;
   bool _patientFound = false;
   bool _patientNotFound = false;
+  Timer? _searchTimer;
 
   final _mrCtrl = TextEditingController();
   final _nameCtrl = TextEditingController();
@@ -68,6 +70,7 @@ class _AppointmentDialogState extends State<AppointmentDialog> {
 
   @override
   void dispose() {
+    _searchTimer?.cancel();
     _mrCtrl.dispose();
     _nameCtrl.dispose();
     _contactCtrl.dispose();
@@ -76,29 +79,28 @@ class _AppointmentDialogState extends State<AppointmentDialog> {
     super.dispose();
   }
 
-  void _onMrChanged(String val) async {
-    final raw = val.replaceAll(RegExp(r'[^0-9]'), '');
-    if (raw.isEmpty) {
-      setState(() {
-        _patientFound = false;
-        _patientNotFound = false;
-      });
-      _nameCtrl.clear();
-      _contactCtrl.clear();
-      _addressCtrl.clear();
+  void _onMrChanged(String val) {
+    _searchTimer?.cancel();
+    _searchTimer = Timer(const Duration(milliseconds: 600), () => _performLookup(val));
+  }
+
+  Future<void> _performLookup(String val) async {
+    final input = val.trim().toUpperCase();
+    if (input.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _patientFound = false;
+          _patientNotFound = false;
+        });
+        _nameCtrl.clear();
+        _contactCtrl.clear();
+        _addressCtrl.clear();
+      }
       return;
     }
 
-    // Auto-pad if input is short and has significant length (e.g., > 0)
-    // We'll also handle this in onSubmitted for immediate effect
-    String formatted = raw;
-    if (raw.isNotEmpty && raw.length < 5) {
-      // We don't pad immediately on change as it makes typing hard, 
-      // but we use the padded version for looking up.
-    }
-
     final mrProv = Provider.of<MrProvider>(context, listen: false);
-    final patient = await mrProv.findByMrNumber(raw, normalize: true);
+    final patient = await mrProv.findByMrNumber(input, normalize: false);
 
     if (!mounted) return;
 
@@ -112,12 +114,14 @@ class _AppointmentDialogState extends State<AppointmentDialog> {
       _contactCtrl.text = patient.phoneNumber;
       _addressCtrl.text = patient.address;
       
-      // Fetch visit history
-      context.read<ConsultationProvider>().fetchPatientHistory(raw);
+      // Removed automatic MR field formatting to keep user input (e.g. "1") as-is.
+      
+      // Fetch visit history using the normalized MR number
+      context.read<ConsultationProvider>().fetchPatientHistory(patient.mrNumber);
     } else {
       setState(() {
         _patientFound = false;
-        _patientNotFound = raw.length >= 3;
+        _patientNotFound = input.length >= 3;
         _isFirstVisit = true;
       });
       _nameCtrl.clear();
@@ -330,7 +334,9 @@ class _AppointmentDialogState extends State<AppointmentDialog> {
       followUpCharges: widget.doctor.followUpCharges,
       availableDays: widget.doctor.availableDays,
       timings: widget.doctor.timings,
-      hospital: widget.doctor.hospital,
+      hospital: widget.doctor.hospital.isEmpty || widget.doctor.hospital.toLowerCase().contains('al-rehman') 
+          ? 'Waseela Diabesity Center' 
+          : widget.doctor.hospital,
       mrNo: _mrCtrl.text,
       patientName: _nameCtrl.text.trim(),
       contactNo: _contactCtrl.text.trim(),
@@ -636,7 +642,9 @@ class _AppointmentDialogState extends State<AppointmentDialog> {
                                 const SizedBox(width: 4),
                                 Expanded(
                                   child: Text(
-                                    widget.doctor.hospital,
+                                    widget.doctor.hospital.isEmpty || widget.doctor.hospital.toLowerCase().contains('al-rehman') 
+                                        ? 'Waseela Diabesity Center' 
+                                        : widget.doctor.hospital,
                                     style: TextStyle(
                                       fontSize: fsXS,
                                       color: Colors.grey.shade600,
@@ -958,9 +966,21 @@ class _AppointmentDialogState extends State<AppointmentDialog> {
                           controller: _mrCtrl,
                           focusNode: _mrFocusNode,
                           keyboardType: TextInputType.number,
+                          onChanged: (v) {
+                            final filtered = v.replaceAll(RegExp(r'\D'), '');
+                            if (filtered != v) {
+                              _mrCtrl.text = filtered;
+                              _mrCtrl.selection = TextSelection.collapsed(offset: filtered.length);
+                            }
+                            _onMrChanged(filtered);
+                          },
+                          onFieldSubmitted: (v) {
+                            _searchTimer?.cancel();
+                            _performLookup(v.trim());
+                          },
                           style: TextStyle(
                               fontSize: fs, fontWeight: FontWeight.bold),
-                          decoration: _dec('e.g. 00001', sw, fs).copyWith(
+                          decoration: _dec('e.g. 1', sw, fs).copyWith(
                             suffixIcon: _patientFound
                                 ? const Icon(Icons.check_circle_rounded,
                                     color: Colors.green, size: 20)
@@ -974,7 +994,6 @@ class _AppointmentDialogState extends State<AppointmentDialog> {
                                 ? Colors.green.withOpacity(0.04)
                                 : Colors.white,
                           ),
-                          onChanged: _onMrChanged,
                         ),
                         if (_patientFound)
                           _chipMsg(
