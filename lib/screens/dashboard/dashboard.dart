@@ -939,6 +939,29 @@ class _DashboardBodyState extends State<_DashboardBody> {
                               'trend_${dashboardProv.selectedDate}'),
                           margin: EdgeInsets.zero,
                           plotAreaBorderWidth: 0,
+                          trackballBehavior: TrackballBehavior(
+                            enable: true,
+                            activationMode: ActivationMode.singleTap,
+                            tooltipDisplayMode: TrackballDisplayMode.nearestPoint,
+                            tooltipSettings: InteractiveTooltip(
+                              enable: true,
+                              color: Colors.white.withOpacity(0.95),
+                              textStyle: const TextStyle(color: Colors.black87, fontSize: 12, fontWeight: FontWeight.bold),
+                              format: 'point.x : PKR point.y',
+                              borderColor: Colors.black12,
+                              borderWidth: 1,
+                            ),
+                            lineType: TrackballLineType.vertical,
+                            lineColor: Colors.grey.shade300,
+                            lineWidth: 1,
+                            markerSettings: const TrackballMarkerSettings(
+                              markerVisibility: TrackballVisibilityMode.visible,
+                              height: 10,
+                              width: 10,
+                              borderWidth: 2,
+                              borderColor: Colors.white,
+                            ),
+                          ),
                           primaryXAxis: CategoryAxis(
                             majorGridLines:
                             const MajorGridLines(width: 0),
@@ -949,29 +972,31 @@ class _DashboardBodyState extends State<_DashboardBody> {
                                 fontSize: 9,
                                 color: Color(0xFF94A3B8)),
                           ),
-                          primaryYAxis: NumericAxis(isVisible: false),
+                          primaryYAxis: NumericAxis(
+                            isVisible: false,
+                            minimum: 0,       // ← prevents clipping at the bottom
+                            numberFormat: NumberFormat('#,###'),
+                          ),
                           series: <CartesianSeries>[
-                            LineSeries<ChartDataPoint, String>(
-                              animationDuration: 0,
+                            // ── Background light grey area ────────────────────────────────────────
+                            AreaSeries<ChartDataPoint, String>(
+                              animationDuration: 800,
                               dataSource: dashboardProv.trendData,
-                              xValueMapper:
-                                  (ChartDataPoint data, _) => data.x,
-                              yValueMapper:
-                                  (ChartDataPoint data, _) => data.y,
-                              dataLabelMapper:
-                                  (ChartDataPoint data, _) =>
-                              'PKR ${NumberFormat('#,###').format(data.y)}',
-                              color: const Color(0xFF10B981),
-                              width: 2,
-                              markerSettings:
-                              const MarkerSettings(isVisible: true),
-                              dataLabelSettings:
-                              const DataLabelSettings(
-                                isVisible: true,
-                                textStyle: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold),
-                              ),
+                              xValueMapper: (ChartDataPoint data, _) => data.x,
+                              yValueMapper: (ChartDataPoint data, _) => data.y,
+                              color: const Color(0xFFCBD5E0).withOpacity(0.35),
+                              borderColor: const Color(0xFF94A3B8),
+                              borderWidth: 1.5,
+                            ),
+                            // ── Foreground dark/black area ────────────────────────────────────────
+                            AreaSeries<ChartDataPoint, String>(
+                              animationDuration: 800,
+                              dataSource: dashboardProv.trendData,
+                              xValueMapper: (ChartDataPoint data, _) => data.x,
+                              yValueMapper: (ChartDataPoint data, _) => data.y * 0.62,
+                              color: const Color(0xFF1E293B).withOpacity(0.88),
+                              borderColor: const Color(0xFF0F172A),
+                              borderWidth: 2,
                             ),
                           ],
                         ),

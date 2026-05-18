@@ -328,26 +328,7 @@ class _CustomDrawerState extends State<CustomDrawer> {
                     ),
 
                   // ── Prescription Dropdown ──────────────────────────────────
-                  if (prescriptionItems.isNotEmpty)
-                    _buildGroupHeader(
-                      icon: Icons.description_outlined,
-                      title: 'Prescription',
-                      isExpanded: _prescriptionExpanded,
-                      hasActiveChild: _prescriptionIndices.contains(
-                        widget.selectedIndex,
-                      ),
-                      onTap: () => setState(
-                        () => _prescriptionExpanded = !_prescriptionExpanded,
-                      ),
-                    ),
-                  if (_prescriptionExpanded)
-                    ...prescriptionItems.map(
-                      (item) => _buildSubDrawerItem(
-                        icon: item.icon,
-                        title: item.title,
-                        index: item.index,
-                      ),
-                    ),
+
 
                   // ── OPD Dropdown ───────────────────────────────────────────
                   if (opdItems.isNotEmpty)
@@ -368,7 +349,26 @@ class _CustomDrawerState extends State<CustomDrawer> {
                         index: item.index,
                       ),
                     ),
-
+                  if (prescriptionItems.isNotEmpty)
+                    _buildGroupHeader(
+                      icon: Icons.description_outlined,
+                      title: 'Prescription',
+                      isExpanded: _prescriptionExpanded,
+                      hasActiveChild: _prescriptionIndices.contains(
+                        widget.selectedIndex,
+                      ),
+                      onTap: () => setState(
+                            () => _prescriptionExpanded = !_prescriptionExpanded,
+                      ),
+                    ),
+                  if (_prescriptionExpanded)
+                    ...prescriptionItems.map(
+                          (item) => _buildSubDrawerItem(
+                        icon: item.icon,
+                        title: item.title,
+                        index: item.index,
+                      ),
+                    ),
                   // ── Pharmacy Dropdown ──────────────────────────────────────────────
                   if (pharmacyItems.isNotEmpty)
                     _buildGroupHeader(

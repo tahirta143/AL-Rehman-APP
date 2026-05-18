@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../custum widgets/drawer/base_scaffold.dart';
 import '../../providers/prescription_provider/prescription_provider.dart';
+import '../../providers/eye_provider/fundus_provider.dart';
+import '../../models/eye_model/fundus_examination_model.dart';
+
 import '../../core/providers/permission_provider.dart';
 import '../../core/permissions/permission_keys.dart';
 import '../../models/prescription_model/prescription_model.dart';
@@ -184,128 +187,12 @@ class _EyePatientInfoCard extends StatelessWidget {
           const SizedBox(height: 12),
           _InputField(label: 'Address', hint: '', initialValue: p?.address, readOnly: true),
           const SizedBox(height: 16),
-          _VitalsSummaryBox(vitals: provider.currentVitals),
         ],
       ),
     );
   }
 }
 
-// ─── Vitals Summary Widget ────────────────────────────────────────────────────
-class _VitalsSummaryBox extends StatelessWidget {
-  final VitalsModel? vitals;
-  const _VitalsSummaryBox({this.vitals});
-
-  @override
-  Widget build(BuildContext context) {
-    if (vitals == null) {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF1F5F9), // slate-100
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xFFE2E8F0)), // slate-200
-        ),
-        child: const Row(
-          children: [
-            Icon(Icons.info_outline, size: 14, color: Colors.amber),
-            SizedBox(width: 8),
-            Text('No vitals recorded for this visit', style: TextStyle(fontSize: 10, color: Color(0xFF64748B), fontStyle: FontStyle.italic)),
-          ],
-        ),
-      );
-    }
-
-    final items = [
-      {'label': 'Weight', 'val': '${vitals!.weight ?? '—'}', 'unit': 'kg'},
-      {'label': 'Height', 'val': '${vitals!.height ?? '—'}', 'unit': 'in'},
-      {'label': 'BMI', 'val': '${vitals!.bmi ?? '—'}', 'unit': ''},
-      {'label': 'B.P.', 'val': (vitals!.systolic != null && vitals!.diastolic != null) ? '${vitals!.systolic}/${vitals!.diastolic}' : '—', 'unit': 'mmHg'},
-      {'label': 'Pulse', 'val': '${vitals!.pulse ?? '—'}', 'unit': 'bpm'},
-      {'label': 'SpO2', 'val': '${vitals!.spo2 ?? '—'}', 'unit': '%'},
-      {'label': 'Temp', 'val': '${vitals!.temperature ?? '—'}', 'unit': '°F'},
-      {'label': 'Pain', 'val': '${vitals!.painScale}', 'unit': '/10'},
-    ];
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: kBg.withOpacity(0.5),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFDBEAFE)), // blue-100
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Icon(Icons.monitor_heart_outlined, size: 14, color: Color(0xFF3B82F6)), // blue-500
-              SizedBox(width: 6),
-              const Text('PATIENT VITALS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A), letterSpacing: 0.5)),
-            ],
-          ),
-          const SizedBox(height: 10),
-          LayoutBuilder(builder: (context, lbc) {
-            final sw = MediaQuery.of(context).size.width;
-            final isT = sw > 600;
-            final crossCount = isT ? 8 : 4;
-            // Lower aspect ratio means more height per cell
-            final aspectRatio = isT ? 1.6 : (sw < 380 ? 1.2 : 1.4);
-
-            return GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: crossCount,
-                crossAxisSpacing: 8,
-                mainAxisSpacing: 8,
-                childAspectRatio: aspectRatio,
-              ),
-              itemCount: items.length,
-              itemBuilder: (context, i) {
-                final it = items[i];
-                return Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: kWhite,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: const Color(0xFFF1F5F9)), // slate-100
-                    boxShadow: [
-                      BoxShadow(color: Colors.black.withOpacity(0.01), blurRadius: 2, offset: const Offset(0, 1)),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(it['label']!.toUpperCase(), style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: kTextMid)), 
-                      const SizedBox(height: 2),
-                      FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.baseline,
-                          textBaseline: TextBaseline.alphabetic,
-                          children: [
-                            Text(it['val']!, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: it['val'] == '—' ? kTextMid.withOpacity(0.5) : kTextDark)),
-                            if (it['unit'] != '' && it['val'] != '—') ...[
-                              const SizedBox(width: 2),
-                              Text(it['unit']!, style: const TextStyle(fontSize: 8, color: kTextMid)),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            );
-          }),
-        ],
-      ),
-    );
-  }
-}
 
 class _InputField extends StatefulWidget {
   final String label;
@@ -1874,24 +1761,42 @@ class _EyeSavePrintButton extends StatelessWidget {
         children: [
           ElevatedButton.icon(
             onPressed: provider.currentPatient == null ? null : () async {
+              debugPrint('🟢 [EyePrescriptionScreen] Save & Print button pressed');
               final patient = provider.currentPatient;
+              debugPrint('🟢 [EyePrescriptionScreen] Current patient: ${patient?.fullName} (${patient?.mrNumber})');
               try {
                 final success = await provider.savePrescription(
                   isEye: true,
                   doctorName: perm.fullName ?? 'Doctor',
                   doctorSrlNo: 1, 
                 );
+                debugPrint('🟢 [EyePrescriptionScreen] Save result: $success');
+
                 
                 if (!context.mounted) return;
                 
                 if (success) {
                   final rx = provider.lastSavedPrescription;
                   if (rx != null && patient != null) {
+                    // Fetch recent fundus records to match React behavior
+                    List<FundusRecord>? recentFundus;
+                    try {
+                      final fundusProvider = context.read<FundusProvider>();
+                      await fundusProvider.fetchHistory(patient.mrNumber);
+                      recentFundus = fundusProvider.records;
+                      if (recentFundus.length > 3) {
+                        recentFundus = recentFundus.sublist(0, 3);
+                      }
+                    } catch (e) {
+                      debugPrint('❌ Error fetching fundus records: $e');
+                    }
+
                     // IMPORTANT: We MUST NOT show a SnackBar here. 
                     // The Printing.layoutPdf dialog pauses the app immediately.
                     // If a SnackBar is animating when the app pauses, Flutter crashes.
-                    await PDFEyePrescriptionService.printPrescription(rx, patient);
+                    await PDFEyePrescriptionService.printPrescription(rx, patient, recentFundusRecords: recentFundus);
                   }
+
                 } else {
                   WidgetsBinding.instance.addPostFrameCallback((_) {
                     snackbarKey.currentState?.showSnackBar(const SnackBar(

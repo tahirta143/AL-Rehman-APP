@@ -356,25 +356,30 @@ class PrescriptionModel {
     this.eyeDetails,
   });
 
-  Map<String, dynamic> toJson() => {
-    'prescription_id': id,
-    'mr_number': mrNumber,
-    'doctor_name': doctorName,
-    'doctor_srl_no': doctorSrlNo,
-    'receipt_id': receiptId,
-    'created_at': createdAt,
-    'vitals': vitals,
-    'history_examination': historyExamination,
-    'treatment': treatment,
-    'consultant_notes': consultantNotes,
-    'remarks': remarks,
-    'refer_to': referTo,
-    'medicines': medicines.map((e) => e.toJson()).toList(),
-    'investigations': investigations.map((e) => e.toJson()).toList(),
-    'instructions': instructions,
-    'diagnosis_answers': diagnosis.map((e) => e.toJson()).toList(),
-    'eye_details': eyeDetails?.toJson(),
-  };
+  Map<String, dynamic> toJson() {
+    final map = <String, dynamic>{
+      'prescription_id': id,
+      'mr_number': mrNumber,
+      'doctor_name': doctorName,
+      'doctor_srl_no': doctorSrlNo,
+      'receipt_id': receiptId,
+      'created_at': createdAt,
+      'vitals': vitals,
+      'history_examination': historyExamination,
+      'treatment': treatment,
+      'consultant_notes': consultantNotes,
+      'remarks': remarks,
+      'refer_to': referTo,
+      'medicines': medicines.map((e) => e.toJson()).toList(),
+      'investigations': investigations.map((e) => e.toJson()).toList(),
+      'instructions': instructions,
+      'diagnosis_answers': diagnosis.map((e) => e.toJson()).toList(),
+    };
+    if (eyeDetails != null) {
+      map['eye_details'] = eyeDetails!.toJson();
+    }
+    return map;
+  }
 
   factory PrescriptionModel.fromJson(Map<String, dynamic> json) {
     dynamic rawEye = json['eye_details'];

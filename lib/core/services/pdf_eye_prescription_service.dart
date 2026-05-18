@@ -4,20 +4,26 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import '../../models/prescription_model/prescription_model.dart';
 import '../../models/mr_model/mr_patient_model.dart';
+import '../../models/eye_model/fundus_examination_model.dart';
 
 class PDFEyePrescriptionService {
-  static Future<void> sharePrescription(PrescriptionModel rx, PatientModel patient) async {
-    final pdf = await _generateDocument(rx, patient);
+  static Future<void> sharePrescription(PrescriptionModel rx, PatientModel patient, {List<FundusRecord>? recentFundusRecords}) async {
+    final pdf = await _generateDocument(rx, patient, recentFundusRecords: recentFundusRecords);
+
     await Printing.sharePdf(
       bytes: await pdf.save(),
       filename: 'EyePrescription_${rx.mrNumber}.pdf',
     );
   }
 
-  static Future<pw.Document> _generateDocument(PrescriptionModel rx, PatientModel patient) async {
+  static Future<pw.Document> _generateDocument(PrescriptionModel rx, PatientModel patient, {List<FundusRecord>? recentFundusRecords}) async {
+    // ignore: avoid_print
+    print('📄 [PDFEyePrescriptionService] Generating document. Medicines count: ${rx.medicines.length}');
+    
     final pdf = pw.Document();
     final font = pw.Font.helvetica();
     final fontBold = pw.Font.helveticaBold();
+
 
     pdf.addPage(
       pw.MultiPage(
@@ -41,6 +47,10 @@ class PDFEyePrescriptionService {
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
+                    if (rx.historyExamination?.isNotEmpty == true || rx.treatment?.isNotEmpty == true || rx.consultantNotes?.isNotEmpty == true || rx.remarks?.isNotEmpty == true) ...[
+                      _buildNotes(rx, font, fontBold),
+                      pw.SizedBox(height: 10),
+                    ],
                     pw.Text('Rx', style: pw.TextStyle(font: fontBold, fontSize: 24, color: PdfColors.blue900)),
                     pw.SizedBox(height: 10),
                     if (rx.medicines.isNotEmpty)
@@ -59,9 +69,17 @@ class PDFEyePrescriptionService {
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                    if (rx.diagnosis.isNotEmpty) _buildDiagnosis(rx, font, fontBold),
+                    if (rx.referTo?.isNotEmpty == true) ...[
+                      _sectionTitle('Follow-ups', fontBold),
+                      pw.Text('• ${rx.referTo}', style: pw.TextStyle(font: font, fontSize: 10)),
+                      pw.SizedBox(height: 10),
+                    ],
                     if (rx.investigations.isNotEmpty) _buildInvestigations(rx, font, fontBold),
                     if (rx.eyeDetails != null) _buildEyeDetails(rx.eyeDetails!, font, fontBold),
+                    if (recentFundusRecords != null && recentFundusRecords.isNotEmpty) ...[
+                      pw.SizedBox(height: 10),
+                      _buildRecentFundus(recentFundusRecords, font, fontBold),
+                    ],
                   ],
                 ),
               ),
@@ -73,9 +91,10 @@ class PDFEyePrescriptionService {
     return pdf;
   }
 
-  static Future<void> printPrescription(PrescriptionModel rx, PatientModel patient) async {
+  static Future<void> printPrescription(PrescriptionModel rx, PatientModel patient, {List<FundusRecord>? recentFundusRecords}) async {
     try {
-      final pdf = await _generateDocument(rx, patient);
+      final pdf = await _generateDocument(rx, patient, recentFundusRecords: recentFundusRecords);
+
       await Printing.layoutPdf(
         onLayout: (PdfPageFormat format) async => pdf.save(),
         name: 'EyePrescription_${rx.mrNumber}.pdf',
@@ -229,6 +248,37 @@ class PDFEyePrescriptionService {
     );
   }
 
+  static pw.Widget _buildNotes(PrescriptionModel rx, pw.Font font, pw.Font fontBold) {
+    final notes = [
+      if (rx.historyExamination?.isNotEmpty == true) {'label': 'History / Examination', 'val': rx.historyExamination!},
+      if (rx.treatment?.isNotEmpty == true) {'label': 'Treatment', 'val': rx.treatment!},
+      if (rx.consultantNotes?.isNotEmpty == true) {'label': 'Consultant Notes', 'val': rx.consultantNotes!},
+      if (rx.remarks?.isNotEmpty == true) {'label': 'Remarks', 'val': rx.remarks!},
+    ];
+
+    if (notes.isEmpty) return pw.SizedBox();
+
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        _sectionTitle('Notes', fontBold),
+        ...notes.map((n) => pw.Padding(
+          padding: const pw.EdgeInsets.only(bottom: 4),
+          child: pw.RichText(
+            text: pw.TextSpan(
+              style: pw.TextStyle(font: font, fontSize: 10, color: PdfColors.grey800),
+              children: [
+                pw.TextSpan(text: '${n['label']}: ', style: pw.TextStyle(font: fontBold, color: PdfColors.blue900)),
+                pw.TextSpan(text: n['val']!),
+              ],
+            ),
+          ),
+        )),
+        pw.SizedBox(height: 10),
+      ],
+    );
+  }
+
   static pw.Widget _buildDiagnosis(PrescriptionModel rx, pw.Font font, pw.Font fontBold) {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -328,6 +378,54 @@ class PDFEyePrescriptionService {
       ),
     );
   }
+
+  static pw.Widget _buildRecentFundus(List<FundusRecord> records, pw.Font font, pw.Font fontBold) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.all(8),
+      decoration: pw.BoxDecoration(
+        border: pw.Border.all(color: PdfColors.grey300),
+        borderRadius: pw.BorderRadius.circular(6),
+        color: PdfColors.grey50,
+      ),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text('RECENT FUNDUS EXAMINATIONS', style: pw.TextStyle(font: fontBold, fontSize: 10, letterSpacing: 1)),
+          pw.SizedBox(height: 8),
+          ...records.map((record) {
+            final dateStr = record.examinationDate;
+            final findings = record.findings;
+            final other = record.otherFindings;
+
+            final findingsStr = findings.entries
+                .where((e) => e.value.right == true || e.value.left == true)
+                .map((e) {
+                  final side = (e.value.right == true && e.value.left == true)
+                      ? 'Both'
+                      : (e.value.right == true ? 'Right' : 'Left');
+                  return '${e.key} ($side)';
+                })
+                .join(', ');
+
+            return pw.Padding(
+              padding: const pw.EdgeInsets.only(bottom: 6),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text('Date: $dateStr', style: pw.TextStyle(font: fontBold, fontSize: 8, color: PdfColors.grey700)),
+                  if (findingsStr.isNotEmpty)
+                    pw.Text('Findings: $findingsStr', style: pw.TextStyle(font: font, fontSize: 8)),
+                  if (other.isNotEmpty)
+                    pw.Text('Other: $other', style: pw.TextStyle(font: font, fontSize: 8, fontStyle: pw.FontStyle.italic)),
+                ],
+              ),
+            );
+          }).toList(),
+        ],
+      ),
+    );
+  }
+
 
   static bool _hasRefractionData(RefractionMatrix r) {
     return r.sph.isNotEmpty || r.cyl.isNotEmpty || r.axis.isNotEmpty || r.va.isNotEmpty || r.addition.isNotEmpty;

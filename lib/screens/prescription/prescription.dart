@@ -220,11 +220,15 @@ class _SavePrintButton extends StatelessWidget {
       height: isTablet ? 52 : 48,
       child: ElevatedButton.icon(
         onPressed: provider.currentPatient == null ? null : () async {
+          debugPrint('🟢 [PrescriptionScreen] Save & Print button pressed');
           final patient = provider.currentPatient;
+          debugPrint('🟢 [PrescriptionScreen] Current patient: ${patient?.fullName} (${patient?.mrNumber})');
+          
           final success = await provider.savePrescription(
             doctorName: perm.fullName ?? 'Doctor',
             doctorSrlNo: 1, // Defaulting for now
           );
+          debugPrint('🟢 [PrescriptionScreen] Save result: $success');
           if (success && patient != null) {
             final rx = provider.lastSavedPrescription;
             if (rx != null) {
@@ -429,33 +433,16 @@ class _VitalsSummaryBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (vitals == null) {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF1F5F9), // slate-100
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xFFE2E8F0)), // slate-200
-        ),
-        child: const Row(
-          children: [
-            Icon(Icons.info_outline, size: 14, color: Colors.amber),
-            SizedBox(width: 8),
-            Text('No vitals recorded for this visit', style: TextStyle(fontSize: 10, color: Color(0xFF64748B), fontStyle: FontStyle.italic)),
-          ],
-        ),
-      );
-    }
-
+    final provider = context.watch<PrescriptionProvider>();
     final items = [
-      {'label': 'Weight', 'val': '${vitals!.weight ?? '—'}', 'unit': 'kg'},
-      {'label': 'Height', 'val': '${vitals!.height ?? '—'}', 'unit': 'in'},
-      {'label': 'BMI', 'val': '${vitals!.bmi ?? '—'}', 'unit': ''},
-      {'label': 'B.P.', 'val': (vitals!.systolic != null && vitals!.diastolic != null) ? '${vitals!.systolic}/${vitals!.diastolic}' : '—', 'unit': 'mmHg'},
-      {'label': 'Pulse', 'val': '${vitals!.pulse ?? '—'}', 'unit': 'bpm'},
-      {'label': 'SpO2', 'val': '${vitals!.spo2 ?? '—'}', 'unit': '%'},
-      {'label': 'Temp', 'val': '${vitals!.temperature ?? '—'}', 'unit': '°F'},
-      {'label': 'Pain', 'val': '${vitals!.painScale}', 'unit': '/10'},
+      {'label': 'Weight', 'key': 'weight', 'unit': 'kg'},
+      {'label': 'Height', 'key': 'height', 'unit': 'in'},
+      {'label': 'BMI', 'key': 'bmi', 'unit': '', 'readOnly': true},
+      {'label': 'B.P.', 'key': 'bp', 'unit': 'mmHg'},
+      {'label': 'Pulse', 'key': 'pulse', 'unit': 'bpm'},
+      {'label': 'SpO2', 'key': 'spo2', 'unit': '%'},
+      {'label': 'Temp', 'key': 'temp', 'unit': '°F'},
+      {'label': 'Pain', 'key': 'pain_scale', 'unit': '/10'},
     ];
 
     return Container(
@@ -468,11 +455,26 @@ class _VitalsSummaryBox extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Icon(Icons.monitor_heart_outlined, size: 14, color: Color(0xFF3B82F6)), // blue-500
-              SizedBox(width: 6),
-              Text('VITALS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A), letterSpacing: 0.5)),
+              const Row(
+                children: [
+                  Icon(Icons.monitor_heart_outlined, size: 14, color: Color(0xFF3B82F6)), // blue-500
+                  SizedBox(width: 6),
+                  Text('VITALS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A), letterSpacing: 0.5)),
+                ],
+              ),
+              if (vitals == null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF3C7), // amber-100
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: const Color(0xFFFDE68A)), // amber-200
+                  ),
+                  child: const Text('No vitals recorded', style: TextStyle(fontSize: 8, color: Color(0xFFB45309), fontStyle: FontStyle.italic)),
+                ),
             ],
           ),
           const SizedBox(height: 10),
@@ -480,8 +482,6 @@ class _VitalsSummaryBox extends StatelessWidget {
             final sw = MediaQuery.of(context).size.width;
             final isT = sw > 600;
             final crossCount = isT ? 8 : 4;
-            // Lower aspect ratio means more height per cell
-            // 1.2 for small phones, 1.4 for others
             final aspectRatio = isT ? 1.6 : (sw < 380 ? 1.2 : 1.5);
 
             return GridView.builder(
@@ -496,6 +496,11 @@ class _VitalsSummaryBox extends StatelessWidget {
               itemCount: items.length,
               itemBuilder: (context, i) {
                 final it = items[i];
+                final key = it['key'] as String;
+                final label = it['label'] as String;
+                final unit = it['unit'] as String;
+                final isReadOnly = it['readOnly'] == true;
+
                 return Container(
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
@@ -511,22 +516,36 @@ class _VitalsSummaryBox extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(it['label']!.toUpperCase(), style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8))), // slate-400
+                      Text(label.toUpperCase(), style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8))), // slate-400
                       const SizedBox(height: 2),
-                      FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.baseline,
-                          textBaseline: TextBaseline.alphabetic,
-                          children: [
-                            Text(it['val']!, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: it['val'] == '—' ? const Color(0xFFCBD5E1) : const Color(0xFF334155))), // slate-700
-                            if (it['unit'] != '' && it['val'] != '—') ...[
-                              const SizedBox(width: 2),
-                              Text(it['unit']!, style: const TextStyle(fontSize: 8, color: Color(0xFF64748B))),
-                            ],
-                          ],
-                        ),
-                      ),
+                      isReadOnly
+                          ? Text(
+                              provider.currentVitals?.bmi?.toString() ?? '—',
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155)),
+                            )
+                          : Row(
+                              crossAxisAlignment: CrossAxisAlignment.baseline,
+                              textBaseline: TextBaseline.alphabetic,
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    controller: provider.vitalControllers[key],
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155)),
+                                    decoration: const InputDecoration(
+                                      isDense: true,
+                                      contentPadding: EdgeInsets.zero,
+                                      border: InputBorder.none,
+                                      hintText: '—',
+                                      hintStyle: TextStyle(color: Color(0xFFCBD5E1)),
+                                    ),
+                                  ),
+                                ),
+                                if (unit != '') ...[
+                                  const SizedBox(width: 2),
+                                  Text(unit, style: const TextStyle(fontSize: 8, color: Color(0xFF64748B))),
+                                ],
+                              ],
+                            ),
                     ],
                   ),
                 );
@@ -977,7 +996,7 @@ class _InvestigationsTabState extends State<_InvestigationsTab> {
   @override
   Widget build(BuildContext context) {
     if (widget.provider.isLoadingTests) {
-      return const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator(color: kTeal)));
+      return const Center(child: Padding(padding: EdgeInsets.all(20), child: CustomLoader()));
     }
 
     final labTests = widget.provider.labTests.where((t) => 
@@ -1054,24 +1073,6 @@ class _InvestigationsTabState extends State<_InvestigationsTab> {
                 Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: color.withOpacity(0.8), letterSpacing: 1.1)),
               ],
             ),
-            if (tests.isNotEmpty || searchQuery.isNotEmpty)
-              SizedBox(
-                width: 150,
-                height: 30,
-                child: TextField(
-                  onChanged: onSearch,
-                  style: const TextStyle(fontSize: 11),
-                  decoration: InputDecoration(
-                    hintText: 'Search...',
-                    prefixIcon: const Icon(Icons.search, size: 14),
-                    contentPadding: EdgeInsets.zero,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(20)),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide(color: color, width: 1)),
-                    filled: true,
-                    fillColor: Colors.grey.shade50,
-                  ),
-                ),
-              ),
           ],
         ),
         const SizedBox(height: 10),
@@ -1081,26 +1082,170 @@ class _InvestigationsTabState extends State<_InvestigationsTab> {
             child: Text(searchQuery.isEmpty ? 'No data available in this category' : 'No matches found', 
               style: TextStyle(fontSize: 11, color: kTextMid.withOpacity(0.6), fontStyle: FontStyle.italic)),
           )
-        else
+        else ...[
+          ElevatedButton.icon(
+            onPressed: () => _showInvestigationPopup(context, title, tests, type, color, icon),
+            icon: const Icon(Icons.add, size: 14),
+            label: Text('Select $title', style: const TextStyle(fontSize: 12)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: color.withOpacity(0.1),
+              foregroundColor: color,
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              minimumSize: const Size(double.infinity, 36),
+            ),
+          ),
+          const SizedBox(height: 10),
+          // Show selected items as chips
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: tests.map((t) {
-              final name = t['test_name'];
-              final isSelected = widget.provider.selectedInvestigations.any((i) => i.investigationType == type && i.testName == name);
-              
-              return FilterChip(
-                label: Text(name.toString(), style: TextStyle(fontSize: 12, color: isSelected ? kTeal : kTextDark)),
-                selected: isSelected,
-                onSelected: (_) => widget.provider.toggleInvestigation(type, name),
-                selectedColor: kTeal.withOpacity(0.1),
-                checkmarkColor: kTeal,
-                backgroundColor: kBg,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: isSelected ? kTeal : kBorder)),
+            children: widget.provider.selectedInvestigations
+                .where((i) => i.investigationType == type)
+                .map((i) {
+              return Chip(
+                label: Text(i.testName, style: const TextStyle(fontSize: 11)),
+                onDeleted: () => widget.provider.toggleInvestigation(type, i.testName),
+                deleteIcon: const Icon(Icons.close, size: 14),
+                backgroundColor: color.withOpacity(0.1),
+                labelStyle: TextStyle(color: color),
+                side: BorderSide(color: color.withOpacity(0.2)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
               );
             }).toList(),
           ),
+        ]
       ],
+    );
+  }
+
+  void _showInvestigationPopup(BuildContext context, String title, List<dynamic> tests, String type, Color color, IconData icon) {
+    String searchQuery = '';
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: '',
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (context, anim1, anim2) {
+        return const SizedBox.shrink();
+      },
+      transitionBuilder: (context, anim1, anim2, child) {
+        return Transform.scale(
+          scale: anim1.value,
+          child: Opacity(
+            opacity: anim1.value,
+            child: StatefulBuilder(
+              builder: (context, setState) {
+                final filteredTests = tests.where((t) => 
+                  t['test_name'].toString().toLowerCase().contains(searchQuery.toLowerCase())
+                ).toList();
+
+                return AlertDialog(
+                  backgroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  contentPadding: EdgeInsets.zero,
+                  content: Container(
+                    width: double.maxFinite,
+                    constraints: const BoxConstraints(minHeight: 200, maxHeight: 400),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Custom Header
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: Color(0xFF00B5AD),
+                            borderRadius: const BorderRadius.only(
+                              topLeft: Radius.circular(16),
+                              topRight: Radius.circular(16),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(icon, color:Colors.white, size: 20),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Select $title',
+                                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                              ),
+                              const Spacer(),
+                              IconButton(
+                                icon: const Icon(Icons.close, size: 20),
+                                onPressed: () => Navigator.pop(context),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        // Search Field
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: TextField(
+                            onChanged: (val) {
+                              setState(() {
+                                searchQuery = val;
+                              });
+                            },
+                            decoration: InputDecoration(
+                              hintText: 'Search tests...',
+                              prefixIcon: const Icon(Icons.search, size: 18),
+                              filled: true,
+                              fillColor: Colors.grey.shade50,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(25),
+                                borderSide: BorderSide.none,
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(25),
+                                borderSide: BorderSide.none,
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(25),
+                                borderSide: BorderSide(color: color, width: 1),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        // List
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: filteredTests.isEmpty
+                                ? const Center(child: Text('No matches found', style: TextStyle(color: Colors.grey)))
+                                : ListView.builder(
+                                    itemCount: filteredTests.length,
+                                    itemBuilder: (context, index) {
+                                      final test = filteredTests[index];
+                                      final name = test['test_name'].toString();
+                                      final isSelected = widget.provider.selectedInvestigations.any((i) => i.investigationType == type && i.testName == name);
+
+                                      return ListTile(
+                                        dense: true,
+                                        title: Text(name, style: const TextStyle(fontSize: 12)),
+                                        trailing: isSelected ? Icon(Icons.check_circle, color: color, size: 18) : null,
+                                        onTap: () {
+                                          widget.provider.toggleInvestigation(type, name);
+                                          setState(() {}); // Update local state for checkmark
+                                        },
+                                      );
+                                    },
+                                  ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        );
+      },
     );
   }
 }

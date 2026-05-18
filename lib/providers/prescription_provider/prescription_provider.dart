@@ -112,6 +112,8 @@ class PrescriptionProvider extends ChangeNotifier {
     'height': TextEditingController(),
     'blood': TextEditingController(),
     'receiptId': TextEditingController(),
+    'spo2': TextEditingController(),
+    'pain_scale': TextEditingController(),
   };
 
   final Map<String, TextEditingController> noteControllers = {
@@ -501,10 +503,23 @@ class PrescriptionProvider extends ChangeNotifier {
           _currentVitals = VitalsModel.fromJson(normalized);
         }
       }
+      if (_currentVitals != null) {
+        _populateVitalControllers(_currentVitals!);
+      }
     } catch (e) {
       debugPrint('Error fetching vitals: $e');
     }
     notifyListeners();
+  }
+
+  void _populateVitalControllers(VitalsModel vitals) {
+    vitalControllers['temp']?.text = vitals.temperature?.toString() ?? '';
+    vitalControllers['bp']?.text = (vitals.systolic != null && vitals.diastolic != null) ? '${vitals.systolic}/${vitals.diastolic}' : '';
+    vitalControllers['pulse']?.text = vitals.pulse?.toString() ?? '';
+    vitalControllers['weight']?.text = vitals.weight?.toString() ?? '';
+    vitalControllers['height']?.text = vitals.height?.toString() ?? '';
+    vitalControllers['spo2']?.text = vitals.spo2?.toString() ?? '';
+    vitalControllers['pain_scale']?.text = vitals.painScale?.toString() ?? '';
   }
 
   Future<void> fetchHistory(String mrNumber) async {
@@ -529,53 +544,57 @@ class PrescriptionProvider extends ChangeNotifier {
     _isLoadingTests = true;
     notifyListeners();
     
-    bool foundLab = false;
-    bool foundRad = false;
+    try {
+      bool foundLab = false;
+      bool foundRad = false;
 
-    if (_connectivity.isOnline.value) {
-      try {
-        final labRes = await _apiService.fetchLabTests()
-            .timeout(const Duration(seconds: 8));
-        if (labRes['success'] == true) {
-          _labTests = labRes['data'] ?? [];
-          foundLab = true;
+      if (_connectivity.isOnline.value) {
+        try {
+          final labRes = await _apiService.fetchLabTests()
+              .timeout(const Duration(seconds: 8));
+          if (labRes['success'] == true) {
+            _labTests = labRes['data'] ?? [];
+            foundLab = true;
+          }
+
+          final radRes = await _apiService.fetchRadiologyTests()
+              .timeout(const Duration(seconds: 8));
+          if (radRes['success'] == true) {
+            _radiologyTests = radRes['data'] ?? [];
+            foundRad = true;
+          }
+        } catch (e) {
+          debugPrint('⚠️ Online tests load failed: $e');
         }
+      }
 
-        final radRes = await _apiService.fetchRadiologyTests()
-            .timeout(const Duration(seconds: 8));
-        if (radRes['success'] == true) {
-          _radiologyTests = radRes['data'] ?? [];
-          foundRad = true;
+      if (!foundLab || !foundRad) {
+        debugPrint('📴 Loading tests from local DB');
+        final localTests = await _db.queryAll('master_investigations');
+        if (!foundLab) {
+          _labTests = localTests.where((t) {
+            final type = (t['test_type'] ?? t['test_category'] ?? '').toString().toLowerCase();
+            return type == 'lab';
+          }).toList();
         }
-      } catch (e) {
-        debugPrint('⚠️ Online tests load failed: $e');
+        if (!foundRad) {
+          _radiologyTests = localTests.where((t) {
+            final type = (t['test_type'] ?? t['test_category'] ?? '').toString().toLowerCase();
+            return type != 'lab' && type.isNotEmpty;
+          }).toList();
+        }
+        // If still empty, split by type
+        if (_labTests.isEmpty && _radiologyTests.isEmpty && localTests.isNotEmpty) {
+          debugPrint('📴 Splitting all ${localTests.length} tests as lab');
+          _labTests = localTests;
+        }
       }
+    } catch (e) {
+      debugPrint('Error loading tests: $e');
+    } finally {
+      _isLoadingTests = false;
+      notifyListeners();
     }
-
-    if (!foundLab || !foundRad) {
-      debugPrint('📴 Loading tests from local DB');
-      final localTests = await _db.queryAll('master_investigations');
-      if (!foundLab) {
-        _labTests = localTests.where((t) {
-          final type = (t['test_type'] ?? t['test_category'] ?? '').toString().toLowerCase();
-          return type == 'lab';
-        }).toList();
-      }
-      if (!foundRad) {
-        _radiologyTests = localTests.where((t) {
-          final type = (t['test_type'] ?? t['test_category'] ?? '').toString().toLowerCase();
-          return type != 'lab' && type.isNotEmpty;
-        }).toList();
-      }
-      // If still empty, split by type
-      if (_labTests.isEmpty && _radiologyTests.isEmpty && localTests.isNotEmpty) {
-        debugPrint('📴 Splitting all ${localTests.length} tests as lab');
-        _labTests = localTests;
-      }
-    }
-
-    _isLoadingTests = false;
-    notifyListeners();
   }
 
   Future<Map<String, dynamic>> searchMedicines(String query) async {
@@ -798,7 +817,10 @@ class PrescriptionProvider extends ChangeNotifier {
   // ─── Submission ──────────────────────────────────────────────────
 
   Future<bool> savePrescription({bool isEye = false, required String doctorName, int? doctorSrlNo}) async {
-    if (_currentPatient == null) return false;
+    if (_currentPatient == null) {
+      debugPrint('⚠️ Cannot save prescription: _currentPatient is null');
+      return false;
+    }
     
     _isSaving = true;
     notifyListeners();
@@ -839,11 +861,20 @@ class PrescriptionProvider extends ChangeNotifier {
 
       bool isSuccess = false;
       if (_connectivity.isOnline.value) {
-        final res = await _apiService.savePrescription(prescription.toJson());
+        final payload = prescription.toJson();
+        debugPrint('📤 Sending prescription payload: ${jsonEncode(payload)}');
+        
+        final res = await _apiService.savePrescription(payload);
+        debugPrint('📥 Received prescription response: $res');
+        
         isSuccess = res['success'] == true ||
             res['status'] == true ||
             res['ok'] == true ||
             (res['message']?.toString().toLowerCase().contains('saved') ?? false);
+            
+        if (!isSuccess) {
+          debugPrint('❌ Prescription save failed on server. Response: $res');
+        }
       } else {
         debugPrint('📴 App is OFFLINE. Saving prescription locally.');
         final visitUuid = _syncService.generateUuid();
