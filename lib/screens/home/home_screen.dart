@@ -4,6 +4,7 @@ import 'package:animate_do/animate_do.dart';
 import '../../core/providers/permission_provider.dart';
 import '../../core/permissions/permission_keys.dart';
 import '../../custum widgets/drawer/base_scaffold.dart';
+import '../../custum widgets/search/global_search_overlay.dart';
 
 // Import all screens for navigation
 import '../dashboard/dashboard.dart' as dash;
@@ -254,49 +255,67 @@ class _HomeBody extends StatelessWidget {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              PopupMenuButton<String>(
-                onSelected: (value) {
-                  if (value == 'profile') {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const ProfileScreen()),
-                    );
-                  } else if (value == 'logout') {
-                    // Handle logout - typically clear providers and pop to login
-                    context.read<PermissionProvider>().clear();
-                    Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
-                  }
-                },
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                icon: Container(
-                  width: 44,
-                  height: 44,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.more_vert_rounded, color: Color(0xFF00B5AD), size: 22),
-                ),
-                itemBuilder: (context) => [
-                  const PopupMenuItem(
-                    value: 'profile',
-                    child: Row(
-                      children: [
-                        Icon(Icons.person_outline, size: 20, color: kTeal),
-                        SizedBox(width: 12),
-                        Text('My Profile'),
-                      ],
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  GestureDetector(
+                    onTap: () => showGlobalSearchOverlay(context),
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.search_rounded, color: Color(0xFF00B5AD), size: 22),
                     ),
                   ),
-                  const PopupMenuItem(
-                    value: 'logout',
-                    child: Row(
-                      children: [
-                        Icon(Icons.logout_rounded, size: 20, color: Colors.redAccent),
-                        SizedBox(width: 12),
-                        Text('Logout', style: TextStyle(color: Colors.redAccent)),
-                      ],
+                  const SizedBox(width: 8),
+                  PopupMenuButton<String>(
+                    onSelected: (value) {
+                      if (value == 'profile') {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                        );
+                      } else if (value == 'logout') {
+                        // Handle logout - typically clear providers and pop to login
+                        context.read<PermissionProvider>().clear();
+                        Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+                      }
+                    },
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                    icon: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.more_vert_rounded, color: Color(0xFF00B5AD), size: 22),
                     ),
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(
+                        value: 'profile',
+                        child: Row(
+                          children: [
+                            Icon(Icons.person_outline, size: 20, color: kTeal),
+                            SizedBox(width: 12),
+                            Text('My Profile'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'logout',
+                        child: Row(
+                          children: [
+                            Icon(Icons.logout_rounded, size: 20, color: Colors.redAccent),
+                            SizedBox(width: 12),
+                            Text('Logout', style: TextStyle(color: Colors.redAccent)),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

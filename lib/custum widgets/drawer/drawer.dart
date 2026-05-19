@@ -327,6 +327,14 @@ class _CustomDrawerState extends State<CustomDrawer> {
                       index: 101,
                     ),
 
+                  // Complaints Board
+                  if (perm.can(Perm.complaintsBoardRead))
+                    _buildDrawerItem(
+                      icon: Icons.hub_outlined,
+                      title: 'Complaints Board',
+                      index: 23,
+                    ),
+
                   // ── Prescription Dropdown ──────────────────────────────────
 
 

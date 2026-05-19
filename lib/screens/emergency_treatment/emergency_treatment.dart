@@ -5,6 +5,7 @@ import 'package:animate_do/animate_do.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../custum widgets/drawer/base_scaffold.dart';
+import '../../custum widgets/search/global_search_overlay.dart';
 import '../../providers/emergency_treatment_provider/emergency_provider.dart';
 import '../../providers/opd/opd_reciepts/opd_reciepts.dart';
 import '../../custum widgets/animations/animations.dart';
@@ -648,30 +649,21 @@ class _EmergencyTreatmentScreenState extends State<EmergencyTreatmentScreen>
             ),
           ],
 
-          // 🕒 TIME BOX
-          Container(
-            padding: EdgeInsets.symmetric(
-              horizontal: _sw * 0.025,
-              vertical: _sh * 0.008,
-            ),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(_sw * 0.025),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.access_time_rounded,
-                    color: Colors.white, size: _sw * 0.035),
-                SizedBox(width: _sw * 0.012),
-                Text(
-                  dateStr,
-                  style: TextStyle(
-                    fontSize: _fsXS,
-                    color: Colors.white,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
+          // 🔍 SEARCH BUTTON
+          GestureDetector(
+            onTap: () => showGlobalSearchOverlay(context),
+            child: Container(
+              margin: EdgeInsets.only(right: _sw * 0.02),
+              padding: EdgeInsets.all(_sw * 0.02),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(_sw * 0.025),
+              ),
+              child: Icon(
+                Icons.search_rounded,
+                color: Colors.white,
+                size: _sw * 0.05,
+              ),
             ),
           ),
         ],
@@ -693,6 +685,61 @@ class _EmergencyTreatmentScreenState extends State<EmergencyTreatmentScreen>
 
   Widget _narrowLayout(EmergencyProvider prov) => _leftForm(prov);
 
+  Widget _buildBodyTimeBox() {
+    final now = DateTime.now();
+    const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    final h   = now.hour;
+    final h12 = h == 0 ? 12 : h > 12 ? h - 12 : h;
+    final ampm = h < 12 ? 'AM' : 'PM';
+    final dateStr = '${now.day} ${mo[now.month-1]} ${now.year}'
+        '  ${_d2(h12)}:${_d2(now.minute)}:${_d2(now.second)} $ampm';
+
+    return Container(
+      margin: EdgeInsets.only(bottom: _sh * 0.014),
+      child: _card(
+        Row(
+          children: [
+            Container(
+              padding: EdgeInsets.all(_sw * 0.02),
+              decoration: BoxDecoration(
+                color: danger.withOpacity(0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.access_time_rounded,
+                color: danger,
+                size: _sw * 0.045,
+              ),
+            ),
+            SizedBox(width: _sw * 0.03),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Admission Date & Time',
+                  style: TextStyle(
+                    fontSize: _fsXS,
+                    color: Colors.black54,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                SizedBox(height: _sh * 0.003),
+                Text(
+                  dateStr,
+                  style: TextStyle(
+                    fontSize: _fs,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   // ════════════════════════════════════════
   //  LEFT FORM
   // ════════════════════════════════════════
@@ -706,6 +753,7 @@ class _EmergencyTreatmentScreenState extends State<EmergencyTreatmentScreen>
               _wide ? _pad * 0.5 : _pad,
               120),
           sliver: SliverList(delegate: SliverChildListDelegate([
+            FadeInUp(delay: const Duration(milliseconds: 50), child: _buildBodyTimeBox()),
             FadeInUp(delay: const Duration(milliseconds: 100), child: _patientInfoCard(prov)),
             SizedBox(height: _sh * 0.014),
             FadeInUp(delay: const Duration(milliseconds: 200), child: _moCard()),

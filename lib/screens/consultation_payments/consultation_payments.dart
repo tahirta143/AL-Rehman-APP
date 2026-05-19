@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../custum widgets/drawer/base_scaffold.dart';
+import '../../custum widgets/search/global_search_overlay.dart';
 import '../../providers/consultant_payments_provider/consultant_payments_provider.dart';
 import '../../models/consultant_payment_model/consultant_payment_model.dart';
 import '../../custum widgets/custom_loader.dart';
@@ -179,6 +180,19 @@ class _ConsultantPaymentsScreenState extends State<ConsultantPaymentsScreen> {
             //     style: TextStyle(fontSize: _fsS, color: Colors.white70)),
           ]),
         ),
+        // Global Search button
+        GestureDetector(
+          onTap: () => showGlobalSearchOverlay(context),
+          child: Container(
+            padding: EdgeInsets.all(_sw * 0.022),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(_sw * 0.022),
+            ),
+            child: Icon(Icons.search_rounded, color: Colors.white, size: _sw * 0.04),
+          ),
+        ),
+        SizedBox(width: _sw * 0.02),
         // Refresh button (matches React)
         GestureDetector(
           onTap: provider.isLoading ? null : _loadData,

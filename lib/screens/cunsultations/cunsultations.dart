@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:ui';
 import 'package:provider/provider.dart';
 import '../../custum widgets/drawer/base_scaffold.dart';
+import '../../custum widgets/search/global_search_overlay.dart';
 import '../../models/consultation_model/appointment_model.dart';
 import '../../models/consultation_model/doctor_model.dart';
 import '../../providers/opd/consultation_provider/cunsultation_provider.dart';
@@ -231,6 +232,19 @@ class _ConsultationScreenState extends State<ConsultationScreen> {
               style: TextStyle(color: Colors.white70, fontSize: sw * 0.028,
                   fontWeight: FontWeight.w500)),
         ])),
+        GestureDetector(
+          onTap: () => showGlobalSearchOverlay(context),
+          child: Container(
+            padding: EdgeInsets.all(sw * 0.022),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(sw * 0.025),
+            ),
+            child: Icon(Icons.search_rounded,
+                color: Colors.white, size: sw * 0.05),
+          ),
+        ),
+        SizedBox(width: sw * 0.02),
         Container(
           padding: EdgeInsets.all(sw * 0.022),
           decoration: BoxDecoration(

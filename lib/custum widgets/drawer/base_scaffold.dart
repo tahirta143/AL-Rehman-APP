@@ -30,6 +30,9 @@ import '../../custum widgets/ai_chat_widget.dart';
 import '../../custum widgets/sync_indicator.dart';
 import '../../screens/sync/sync_dashboard.dart';
 import '../../screens/mr_details/mr_view/mr_view.dart';
+import '../../screens/complaints/complaints_board_screen.dart';
+import '../../custum widgets/search/global_search_overlay.dart';
+
 
 // ─── FIX: Convert BaseScaffold from StatelessWidget to StatefulWidget ─────────
 //
@@ -79,6 +82,19 @@ class BaseScaffold extends StatefulWidget {
 
   final Function(int)? onBottomNavTap;
 
+  static State<BaseScaffold>? activeState;
+
+  static void navigateTo(BuildContext context, int targetIndex) {
+    final state = activeState ?? context.findAncestorStateOfType<_BaseScaffoldState>();
+    if (state != null) {
+      if (state.widget.drawerIndex != targetIndex) {
+        if (state is _BaseScaffoldState) {
+          state._navigateToScreen(context, targetIndex);
+        }
+      }
+    }
+  }
+
   @override
   State<BaseScaffold> createState() => _BaseScaffoldState();
 }
@@ -93,7 +109,16 @@ class _BaseScaffoldState extends State<BaseScaffold> {
   @override
   void initState() {
     super.initState();
+    BaseScaffold.activeState = this;
     _fallbackKey = GlobalKey<ScaffoldState>();
+  }
+
+  @override
+  void dispose() {
+    if (BaseScaffold.activeState == this) {
+      BaseScaffold.activeState = null;
+    }
+    super.dispose();
   }
 
   GlobalKey<ScaffoldState> get _effectiveKey =>
@@ -221,6 +246,20 @@ class _BaseScaffoldState extends State<BaseScaffold> {
                   ),
                 ),
               ),
+              // Global Search Button
+              GestureDetector(
+                onTap: () => showGlobalSearchOverlay(context),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.search_rounded,
+                      color: Colors.white, size: 22),
+                ),
+              ),
+              const SizedBox(width: 8),
               if (widget.actions != null) ...widget.actions!,
               if (widget.showNotificationIcon && widget.actions == null) ...[
                 Container(
@@ -343,6 +382,9 @@ class _BaseScaffoldState extends State<BaseScaffold> {
         break;
       case 22:
         screen = const MrDataViewScreen();
+        break;
+      case 23:
+        screen = const ComplaintsBoardScreen();
         break;
       case 100:
         screen = const SyncDashboardScreen();
