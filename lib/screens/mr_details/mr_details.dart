@@ -165,6 +165,13 @@ class _MrDetailsBodyState extends State<_MrDetailsBody>
 
   void _autoPopulateNextMr() {
     final prov = context.read<MrProvider>();
+    if (prov.selectedPatient != null) {
+      final selectedMr = prov.selectedPatient!.mrNumber;
+      _mrCtrl.text = selectedMr;
+      _lookupMr(selectedMr);
+      prov.selectPatient(null);
+      return;
+    }
     // If we have it already, set it
     if (prov.nextMrNumber != null && _mrCtrl.text.isEmpty && _patient == null) {
       setState(() {

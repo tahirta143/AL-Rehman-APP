@@ -86,6 +86,8 @@ class _VitalsScreenState extends State<VitalsScreen> {
                     const SizedBox(height: 16),
                     if (provider.currentPatient != null) ...[
                       _VitalsForm(provider: provider),
+                       const SizedBox(height: 16),
+                      _RemarksCard(provider: provider),
                       const SizedBox(height: 16),
                       _PainScaleCard(provider: provider),
                       const SizedBox(height: 20),
@@ -304,11 +306,6 @@ class _VitalsForm extends StatelessWidget {
           _VitalGroup(
             title: 'VITAL SIGNS',
             icon: Icons.favorite_border_rounded,
-            headerTrailing: _UnitToggle(
-              value: provider.bpReadingType,
-              onChanged: (val) => provider.setBpReadingType(val),
-              options: const ['regular', 'fasting'],
-            ),
             children: [
               _VitalCard(label: 'Systolic', unit: 'mmHg', controller: provider.controllers['systolic']!, icon: Icons.favorite_rounded),
               _VitalCard(label: 'Diastolic', unit: 'mmHg', controller: provider.controllers['diastolic']!, icon: Icons.favorite_outline_rounded),
@@ -321,6 +318,12 @@ class _VitalsForm extends StatelessWidget {
           _VitalGroup(
             title: 'GLYCEMIC',
             icon: Icons.bloodtype_outlined,
+            headerTrailing: _UnitToggle(
+              value: provider.bsrType,
+              onChanged: (val) => provider.setBsrType(val),
+              options: const ['regular', 'fasting'],
+              labels: const ['Random', 'Fasting'],
+            ),
             children: [
               _VitalCard(label: 'BSR', unit: 'mg/dl', controller: provider.controllers['bsr']!, icon: Icons.water_drop_rounded),
             ],
@@ -587,6 +590,65 @@ class _PainScaleCard extends StatelessWidget {
   }
 }
 
+// ─── Remarks Card ─────────────────────────────────────────────────────────
+class _RemarksCard extends StatelessWidget {
+  final VitalsProvider provider;
+  const _RemarksCard({required this.provider});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: kWhite,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: kTealBorder),
+        boxShadow: kCardShadow,
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.chat_bubble_outline_rounded, color: kTeal, size: 18),
+              SizedBox(width: 8),
+              Text('REMARKS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: kTextDark, letterSpacing: 1)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: provider.controllers['remarks']!,
+            maxLines: 4,
+            minLines: 3,
+            keyboardType: TextInputType.multiline,
+            textInputAction: TextInputAction.newline,
+            style: const TextStyle(fontSize: 13, color: kTextDark),
+            decoration: InputDecoration(
+              hintText: 'Add vitals remarks...',
+              hintStyle: TextStyle(color: kTextMuted.withOpacity(0.7), fontSize: 13),
+              filled: true,
+              fillColor: kTealLight.withOpacity(0.15),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: kTealBorder),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: kTealBorder),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: kTeal, width: 1.5),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ─── Save Section ─────────────────────────────────────────────────────────
 class _SaveSection extends StatelessWidget {
   final VitalsProvider provider;
@@ -636,8 +698,9 @@ class _UnitToggle extends StatelessWidget {
   final String value;
   final Function(String) onChanged;
   final List<String> options;
+  final List<String>? labels;
 
-  const _UnitToggle({required this.value, required this.onChanged, required this.options});
+  const _UnitToggle({required this.value, required this.onChanged, required this.options, this.labels});
 
   @override
   Widget build(BuildContext context) {
@@ -663,7 +726,7 @@ class _UnitToggle extends StatelessWidget {
               ),
               alignment: Alignment.center,
               child: Text(
-                opt.toUpperCase(),
+                (labels != null ? labels![options.indexOf(opt)] : opt).toUpperCase(),
                 style: TextStyle(
                   fontSize: 8,
                   fontWeight: FontWeight.w900,

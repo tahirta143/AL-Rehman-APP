@@ -17,8 +17,10 @@ class VitalsModel {
   final double? whr;
   final String? heightUnit;
   final String? bpReadingType;
+  final String? bsrType;
   final DateTime? createdAt;
   final int? painScale;
+  final String? remarks;
 
   VitalsModel({
     this.id,
@@ -33,6 +35,7 @@ class VitalsModel {
     this.systolic,
     this.diastolic,
     this.bpReadingType = 'regular',
+    this.bsrType = 'regular',
     this.pulse,
     this.spo2,
     this.temperature,
@@ -40,6 +43,7 @@ class VitalsModel {
     this.hip,
     this.whr,
     this.painScale = 0,
+    this.remarks,
     this.createdAt,
   });
 
@@ -69,6 +73,7 @@ class VitalsModel {
       systolic: parseInt(json['systolic']),
       diastolic: parseInt(json['diastolic']),
       bpReadingType: json['bp_reading_type']?.toString() ?? 'regular',
+      bsrType: (json['bsr_type'] ?? '').toString().toLowerCase() == 'fasting' ? 'fasting' : 'regular',
       pulse: parseInt(json['pulse']),
       spo2: parseDouble(json['spo2']),
       temperature: parseDouble(json['temperature']),
@@ -76,6 +81,7 @@ class VitalsModel {
       hip: parseDouble(json['hip']),
       whr: parseDouble(json['whr']),
       painScale: parseInt(json['pain_scale']) ?? 0,
+      remarks: json['remarks']?.toString(),
       createdAt: json['created_at'] != null ? DateTime.parse(json['created_at']) : null,
     );
   }
@@ -93,6 +99,7 @@ class VitalsModel {
       'systolic': systolic,
       'diastolic': diastolic,
       'bp_reading_type': bpReadingType,
+      'bsr_type': bsrType,
       'pulse': pulse,
       'spo2': spo2,
       'temperature': temperature,
@@ -100,6 +107,7 @@ class VitalsModel {
       'hip': hip,
       'whr': whr,
       'pain_scale': painScale,
+      'remarks': remarks,
     };
   }
 }

@@ -41,6 +41,7 @@ class VitalsProvider extends ChangeNotifier {
     'temperature': TextEditingController(),
     'waist': TextEditingController(),
     'hip': TextEditingController(),
+    'remarks': TextEditingController(),
   };
 
   // Computed Values
@@ -50,6 +51,7 @@ class VitalsProvider extends ChangeNotifier {
   int _painScale = 0;
   String _heightUnit = 'in';
   String _bpReadingType = 'regular';
+  String _bsrType = 'regular';
 
   // Getters
   bool get isLoading => _isLoading;
@@ -68,6 +70,7 @@ class VitalsProvider extends ChangeNotifier {
   int get painScale => _painScale;
   String get heightUnit => _heightUnit;
   String get bpReadingType => _bpReadingType;
+  String get bsrType => _bsrType;
 
   VitalsProvider() {
     // Add listeners for real-time calculations
@@ -195,6 +198,8 @@ class VitalsProvider extends ChangeNotifier {
         final data = res['data'];
         _heightUnit = (data['height_unit'] ?? 'in').toString();
         _bpReadingType = (data['bp_reading_type'] ?? 'regular').toString();
+        final rawBsrType = (data['bsr_type'] ?? '').toString().toLowerCase();
+        _bsrType = rawBsrType == 'fasting' ? 'fasting' : 'regular';
         _fillControllers(data);
       } else {
         _clearInputs();
@@ -216,6 +221,7 @@ class VitalsProvider extends ChangeNotifier {
     controllers['waist']!.text = (data['waist'] ?? '').toString();
     controllers['hip']!.text = (data['hip'] ?? '').toString();
     _painScale = (data['pain_scale'] as num?)?.toInt() ?? 0;
+    controllers['remarks']!.text = (data['remarks'] ?? '').toString();
     notifyListeners();
   }
 
@@ -227,6 +233,7 @@ class VitalsProvider extends ChangeNotifier {
     _bmi = '—';
     _bmr = '—';
     _whr = '—';
+    _bsrType = 'regular';
     notifyListeners();
   }
 
@@ -293,6 +300,11 @@ class VitalsProvider extends ChangeNotifier {
 
   void setBpReadingType(String type) {
     _bpReadingType = type;
+    notifyListeners();
+  }
+
+  void setBsrType(String type) {
+    _bsrType = type;
     notifyListeners();
   }
 
@@ -386,6 +398,7 @@ class VitalsProvider extends ChangeNotifier {
         systolic: int.tryParse(controllers['systolic']!.text),
         diastolic: int.tryParse(controllers['diastolic']!.text),
         bpReadingType: _bpReadingType,
+        bsrType: _bsrType,
         pulse: int.tryParse(controllers['pulse']!.text),
         spo2: double.tryParse(controllers['spo2']!.text),
         temperature: double.tryParse(controllers['temperature']!.text),
@@ -393,6 +406,7 @@ class VitalsProvider extends ChangeNotifier {
         hip: double.tryParse(controllers['hip']!.text),
         whr: double.tryParse(_whr),
         painScale: _painScale,
+        remarks: controllers['remarks']!.text.trim().isEmpty ? null : controllers['remarks']!.text.trim(),
       );
 
       if (_connectivity.isOnline.value) {
@@ -425,6 +439,7 @@ class VitalsProvider extends ChangeNotifier {
           'hip': model.hip,
           'whr': model.whr,
           'pain_scale': model.painScale,
+          'remarks': model.remarks,
           'sync_status': 'pending',
           'created_at': DateTime.now().toIso8601String(),
         });

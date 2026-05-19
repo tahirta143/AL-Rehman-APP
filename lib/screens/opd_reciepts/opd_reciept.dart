@@ -130,6 +130,15 @@ class _OpdReceiptScreenState extends State<OpdReceiptScreen> {
 
   void _autoPopulateNextMr() {
     final mrProv = context.read<MrProvider>();
+    if (mrProv.selectedPatient != null) {
+      final selectedMr = mrProv.selectedPatient!.mrNumber;
+      setState(() {
+        _mrNoCtrl.text = selectedMr;
+      });
+      _onMrChanged(selectedMr);
+      mrProv.selectPatient(null);
+      return;
+    }
     if (mrProv.nextMrNumber != null && _mrNoCtrl.text.isEmpty) {
       setState(() {
         _mrNoCtrl.text = mrProv.nextMrNumber!;

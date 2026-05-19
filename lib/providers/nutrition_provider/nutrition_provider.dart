@@ -1,15 +1,31 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../core/services/nutrition_api_service.dart';
+import '../../core/services/ai_api_service.dart';
 import '../../models/nutrition_model/nutrition_prescription_model.dart';
 import '../prescription_provider/prescription_provider.dart';
 
 class NutritionProvider extends ChangeNotifier {
   final NutritionApiService _apiService = NutritionApiService();
+  final AiApiService _aiApiService = AiApiService();
 
   // ─── Loading States ───────────────────────────────────────────────
   bool _isSaving = false;
   bool get isSaving => _isSaving;
+
+  bool _isLoadingHistory = false;
+  bool get isLoadingHistory => _isLoadingHistory;
+
+  bool _analyzingVisits = false;
+  bool get analyzingVisits => _analyzingVisits;
+
+  // ─── History & Analysis ──────────────────────────────────────────
+  List<NutritionPrescriptionModel> _visitHistory = [];
+  List<NutritionPrescriptionModel> get visitHistory => _visitHistory;
+
+  String _visitAnalysis = '';
+  String get visitAnalysis => _visitAnalysis;
+
 
   // ─── Controllers ──────────────────────────────────────────────────
   final Map<String, TextEditingController> controllers = {
@@ -140,6 +156,84 @@ class NutritionProvider extends ChangeNotifier {
       return null;
     } catch (e) {
       return null;
+    }
+  }
+
+  Future<void> fetchHistory(String mrNumber) async {
+    _isLoadingHistory = true;
+    _visitHistory = [];
+    _visitAnalysis = '';
+    notifyListeners();
+
+    try {
+      final res = await _apiService.fetchNutritionistPrescriptionHistory(mrNumber);
+      if (res['success'] == true && res['data'] != null) {
+        final list = res['data'] as List? ?? [];
+        _visitHistory = list.map((x) => NutritionPrescriptionModel.fromJson(x)).toList();
+      }
+    } catch (e) {
+      debugPrint('Error fetching nutritionist history: $e');
+    } finally {
+      _isLoadingHistory = false;
+      notifyListeners();
+    }
+  }
+
+  void clearHistory() {
+    _visitHistory = [];
+    _visitAnalysis = '';
+    _isLoadingHistory = false;
+    _analyzingVisits = false;
+    notifyListeners();
+  }
+
+  Future<bool> summarizeVisitsWithAI(String patientName) async {
+    if (_visitHistory.isEmpty) return false;
+    _analyzingVisits = true;
+    notifyListeners();
+
+    try {
+      final records = _visitHistory.map((visit) => {
+        'date': visit.createdAt,
+        'doctor': visit.doctorName,
+        'vitals': {
+          'bp': visit.bp,
+          'temp': visit.temp,
+          'pulse': visit.pulse,
+          'weight': visit.weight,
+          'height': visit.height,
+          'blood_group': visit.bloodGroup,
+        },
+        'nutrition_assessment': {
+          'total_kilocalories': visit.totalKilocalories,
+          'total_carbs': visit.totalCarbs,
+          'total_proteins': visit.totalProteins,
+          'total_fats': visit.totalFats,
+          'total_fluid_intake': visit.totalFluidIntake,
+          'diet_order': visit.dietOrder,
+          'diet_type': visit.dietType,
+          'dietary_recommendations': visit.dietaryRecommendations,
+          'lifestyle_recommendations': visit.lifestyleRecommendations,
+        },
+        'diet_plan_schedule': visit.dietPlans.map((plan) => {
+          'meal_part': plan.mealPart,
+          'meal_time': plan.mealTime,
+          'food_items': plan.foodItems,
+        }).toList(),
+      }).toList();
+
+      final res = await _aiApiService.summarizePatientHistory(records, patientName);
+      if (res['success'] == true) {
+        _visitAnalysis = res['summary'] ?? '';
+        return true;
+      }
+      return false;
+    } catch (e) {
+      debugPrint('Error summarizing visits: $e');
+      return false;
+    } finally {
+      _analyzingVisits = false;
+      notifyListeners();
     }
   }
 
