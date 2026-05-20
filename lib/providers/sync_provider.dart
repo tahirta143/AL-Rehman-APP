@@ -222,6 +222,31 @@ class SyncProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<Map<String, dynamic>> createSessionSimple({
+    required String name,
+    required String location,
+  }) async {
+    _isSyncing = true;
+    _lastErrorMessage = null;
+    notifyListeners();
+    try {
+      final result = await _syncService.createSessionSimple(
+        name: name,
+        location: location,
+      );
+      if (result['success'] != true) {
+        _lastErrorMessage = result['message'];
+      }
+      return result;
+    } catch (e) {
+      _lastErrorMessage = e.toString();
+      return {'success': false, 'message': e.toString()};
+    } finally {
+      _isSyncing = false;
+      notifyListeners();
+    }
+  }
+
   Future<Map<String, dynamic>> createSession({
     required String name,
     required String location,

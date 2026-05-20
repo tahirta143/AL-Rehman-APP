@@ -672,13 +672,13 @@ class _PatientRow extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 0),
           // Gender
           SizedBox(
-            width: 46,
+            width: 40,
             child: _GenderBadge(gender: patient.gender),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 29),
           // Actions
           Row(
             mainAxisSize: MainAxisSize.min,
@@ -855,7 +855,7 @@ class _GenderBadge extends StatelessWidget {
         : const Color(0xFF718096);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 3),
       decoration: BoxDecoration(
         color: color.withOpacity(0.12),
         borderRadius: BorderRadius.circular(16),

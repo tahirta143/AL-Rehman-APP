@@ -264,6 +264,30 @@ class PatientModel {
     this.visitHistory,
   });
 
+  factory PatientModel.fromCampMap(Map<String, dynamic> p) {
+    return PatientModel(
+      mrNumber: p['mr_number']?.toString() ?? '',
+      firstName: (p['first_name'] ?? '').toString(),
+      lastName: (p['last_name'] ?? '').toString(),
+      guardianName: p['guardian_name']?.toString() ?? '',
+      relation: p['guardian_relation']?.toString() ?? 'Parent',
+      gender: p['gender']?.toString() ?? 'Male',
+      dateOfBirth: p['dob']?.toString() ?? '',
+      age: p['age'] is int ? p['age'] : int.tryParse(p['age']?.toString() ?? ''),
+      bloodGroup: p['blood_group']?.toString() ?? '',
+      profession: p['profession']?.toString() ?? '',
+      education: p['education']?.toString() ?? '',
+      whatsappNo: p['whatsapp_no']?.toString() ?? '',
+      phoneNumber: p['phone']?.toString() ?? '',
+      email: p['email']?.toString() ?? '',
+      cnic: p['cnic']?.toString() ?? '',
+      address: p['address']?.toString() ?? '',
+      city: p['city']?.toString() ?? '',
+      registeredAt: DateTime.tryParse(p['created_at']?.toString() ?? '') ??
+          DateTime.now(),
+    );
+  }
+
   factory PatientModel.fromLocalMap(Map<String, dynamic> v) {
     return PatientModel(
       mrNumber: v['mr_number'] ?? 'PENDING',

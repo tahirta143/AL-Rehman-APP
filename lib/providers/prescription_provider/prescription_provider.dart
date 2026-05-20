@@ -206,6 +206,37 @@ class PrescriptionProvider extends ChangeNotifier {
 
   // ─── Actions ─────────────────────────────────────────────────────
 
+  Future<void> loadCampPatients(String campId) async {
+    _isLoadingPatients = true;
+    notifyListeners();
+    try {
+      final result =
+          await _syncService.fetchWebCampPatients(campId: campId, limit: 200);
+      if (result['success'] == true) {
+        final data = result['data'];
+        final patients = data is Map ? (data['patients'] as List? ?? []) : [];
+        _consultationPatients = patients.map((patient) {
+          final p = patient as Map<String, dynamic>;
+          final name = p['patient_name']?.toString() ??
+              '${p['first_name'] ?? ''} ${p['last_name'] ?? ''}'.trim();
+          return {
+            'srl_no': p['id'] ?? p['mr_number'],
+            'patient_mr_number': p['mr_number'],
+            'receipt_id': '',
+            'patient_name': name,
+            'service_detail': 'Camp patient',
+            'doctor_name': '',
+            'token_number': null,
+          };
+        }).toList();
+      }
+    } catch (e) {
+      debugPrint('Error camp patients: $e');
+    }
+    _isLoadingPatients = false;
+    notifyListeners();
+  }
+
   Future<void> loadConsultationPatients() async {
     _isLoadingPatients = true;
     notifyListeners();

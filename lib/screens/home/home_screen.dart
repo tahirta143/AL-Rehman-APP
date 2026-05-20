@@ -5,6 +5,8 @@ import '../../core/providers/permission_provider.dart';
 import '../../core/permissions/permission_keys.dart';
 import '../../custum widgets/drawer/base_scaffold.dart';
 import '../../custum widgets/search/global_search_overlay.dart';
+import 'package:hims_app/custum widgets/camp_login_modal.dart';
+import '../../providers/camp_provider.dart';
 
 // Import all screens for navigation
 import '../dashboard/dashboard.dart' as dash;
@@ -15,6 +17,10 @@ import '../mr_details/mr_details.dart';
 import '../cunsultations/cunsultations.dart';
 import '../prescription/prescription.dart';
 import '../prescription/eye_prescription.dart';
+import '../prescription/vitals.dart';
+import '../prescription/lab_values.dart';
+import '../prescription/nutrition_screen.dart';
+import '../prescription/fundus_examination_screen.dart';
 import '../consultation_payments/consultation_payments.dart';
 import '../add_expenses/add_expenses.dart';
 import '../shift_management/shift_management.dart';
@@ -59,12 +65,19 @@ class _NavCard {
   });
 }
 
-class _HomeBody extends StatelessWidget {
+class _HomeBody extends StatefulWidget {
   const _HomeBody();
 
   @override
+  State<_HomeBody> createState() => _HomeBodyState();
+}
+
+class _HomeBodyState extends State<_HomeBody> {
+  @override
   Widget build(BuildContext context) {
     final perm = context.watch<PermissionProvider>();
+    final camp = context.watch<CampProvider>();
+    final canAccessCamp = camp.canAccessCampMode(perm.isAdmin, perm.can);
     final user = perm.fullName ?? 'User';
     final role = perm.role ?? 'Staff';
 
@@ -77,16 +90,20 @@ class _HomeBody extends StatelessWidget {
       const _NavCard(label: "MR View", desc: "Search patient database", icon: Icons.manage_search_rounded, drawerIndex: 22, permission: Perm.mrDataViewRead),
       const _NavCard(label: "Appointments", desc: "Consultant scheduling", icon: Icons.calendar_today_rounded, drawerIndex: 1, permission: Perm.apptRead),
       const _NavCard(label: "Prescription", desc: "Consultation notes", icon: Icons.medication_outlined, drawerIndex: 9, permission: Perm.prescriptionRead),
+      const _NavCard(label: "Vitals", desc: "Track patient vitals", icon: Icons.monitor_heart_outlined, drawerIndex: 13, permission: Perm.vitalsRead),
+      const _NavCard(label: "Lab Values", desc: "Track laboratory values", icon: Icons.biotech_outlined, drawerIndex: 14, permission: Perm.labValuesRead),
+      const _NavCard(label: "Nutritionist", desc: "Diet & nutrition plans", icon: Icons.restaurant_menu_outlined, drawerIndex: 15, permission: Perm.nutritionistRead),
+      // const _NavCard(
+      //   label: "Eye Prescription",
+      //   desc: "eye workflow",
+      //   icon: Icons.remove_red_eye_outlined,
+      //   drawerIndex: 12,
+      //   permission: Perm.eyeRecordRead,
+      // ),
+      const _NavCard(label: "Fundus Exam", desc: "Fundus eye examination", icon: Icons.visibility_outlined, drawerIndex: 16, permission: Perm.fundusRead),
       const _NavCard(label: "Consultant Pay", desc: "Doctor payouts", icon: Icons.attach_money_rounded, drawerIndex: 6, permission: Perm.consultantRead),
       const _NavCard(label: "Add Expenses", desc: "Record expenses", icon: Icons.credit_card_rounded, drawerIndex: 2, permission: Perm.expenseRead),
       const _NavCard(label: "Shift Mgmt", desc: "Open/Close shifts", icon: Icons.access_time_rounded, drawerIndex: 7, permission: Perm.opdShiftRead),
-      const _NavCard(
-        label: "Eye Prescription", 
-        desc: "eye workflow", 
-        icon: Icons.remove_red_eye_outlined, 
-        drawerIndex: 12, 
-        permission: Perm.eyeRecordRead,
-      ),
       const _NavCard(label: "Camp Sync", desc: "Camp & data sync", icon: Icons.sync_rounded, drawerIndex: 100, permission: Perm.campDashboardRead),
     ];
 
@@ -118,6 +135,22 @@ class _HomeBody extends StatelessWidget {
                 children: [
                   // Spacer to push content below the fixed header and cards
                   SizedBox(height: size.height * 0.42 + 25),
+
+                  if (canAccessCamp && !camp.isCampMode) ...[
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                      child: _CampJoinBanner(
+                        onJoin: () => CampLoginModal.showJoinDialog(context),
+                      ),
+                    ),
+                  ],
+
+                  if (camp.isCampMode) ...[
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                      child: _ActiveCampBanner(camp: camp),
+                    ),
+                  ],
 
                   // ── Modules Section ──
                   FadeInUp(
@@ -186,6 +219,7 @@ class _HomeBody extends StatelessWidget {
             right: 0,
             child: _buildHeroHeader(context, size, user, role, perm.groups, accessibleCards.length),
           ),
+
         ],
       ),
     );
@@ -342,7 +376,7 @@ class _HomeBody extends StatelessWidget {
           right: 0,
           bottom: 0, // Sits just behind the top edge of the glass cards
           child: Image.asset(
-            'assets/images/doctor2.png',
+            'assets/images/dotor.png',
             height: headerHeight * 0.75, // Scale nicely inside the header
             fit: BoxFit.contain,
             alignment: Alignment.bottomRight,
@@ -499,6 +533,135 @@ class _HomeBody extends StatelessWidget {
   }
 }
 
+class _CampJoinBanner extends StatelessWidget {
+  final VoidCallback onJoin;
+  const _CampJoinBanner({required this.onJoin});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF65B8B5), Color(0xFF009B96)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF009B96).withValues(alpha: 0.25),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'CAMP MODE',
+            style: TextStyle(
+              color: Color(0xFFB2DFDB),
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Join Medical Camp',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Enter an isolated environment for field operations.',
+            style: TextStyle(color: Color(0xFFE0F2F1), fontSize: 12),
+          ),
+          const SizedBox(height: 14),
+          ElevatedButton(
+            onPressed: onJoin,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: const Color(0xFF009B96),
+              elevation: 2,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.festival, size: 18),
+                SizedBox(width: 8),
+                Text('Join Camp', style: TextStyle(fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActiveCampBanner extends StatelessWidget {
+  final CampProvider camp;
+  const _ActiveCampBanner({required this.camp});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE6F7F6),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF00B5AD).withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.festival, color: Color(0xFF00B5AD)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  camp.campDisplayName,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    color: Color(0xFF1A202C),
+                  ),
+                ),
+                if (camp.campLocation.isNotEmpty)
+                  Text(
+                    camp.campLocation,
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF718096)),
+                  ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: () async {
+              await camp.exitCamp();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Exited camp environment')),
+                );
+              }
+            },
+            child: const Text('Exit Camp'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ModuleCard extends StatelessWidget {
   final _NavCard card;
   final int index;
@@ -610,7 +773,11 @@ class _ModuleCard extends StatelessWidget {
       case 8: return const MrDetailsScreen();
       case 1: return const ConsultationScreen();
       case 9: return const PrescriptionScreen();
-      case 12: return const EyePrescriptionScreen();
+      // case 12: return const EyePrescriptionScreen();
+      case 13: return const VitalsScreen();
+      case 14: return const LabValuesScreen();
+      case 15: return const NutritionScreen();
+      case 16: return const FundusExaminationScreen();
       case 6: return const ConsultantPaymentsScreen();
       case 2: return const ExpensesScreen();
       case 7: return const ShiftManagementScreen();

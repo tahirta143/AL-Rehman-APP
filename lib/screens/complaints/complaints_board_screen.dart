@@ -263,7 +263,7 @@ class _ComplaintsBoardScreenState extends State<ComplaintsBoardScreen> {
   @override
   Widget build(BuildContext context) {
     return BaseScaffold(
-      title: 'Visual Complaints Board',
+      title: 'Complaints Board',
       drawerIndex: 23,
       body: Column(
         children: [

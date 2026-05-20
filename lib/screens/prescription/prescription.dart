@@ -6,6 +6,7 @@ import '../../models/prescription_model/prescription_model.dart';
 import '../../models/vitals_model/vitals_model.dart';
 import '../../providers/prescription_provider/prescription_provider.dart';
 import '../../core/providers/permission_provider.dart';
+import '../../providers/camp_provider.dart';
 import '../../custum widgets/custom_loader.dart';
 import '../../custum widgets/animations/animations.dart';
 import 'package:animate_do/animate_do.dart';
@@ -25,7 +26,8 @@ const kWhite = Colors.white;
 
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 class PrescriptionScreen extends StatefulWidget {
-  const PrescriptionScreen({super.key});
+  final String? initialMr;
+  const PrescriptionScreen({super.key, this.initialMr});
 
   @override
   State<PrescriptionScreen> createState() => _PrescriptionScreenState();
@@ -39,12 +41,20 @@ class _PrescriptionScreenState extends State<PrescriptionScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 7, vsync: this);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        final provider = context.read<PrescriptionProvider>();
-        provider.clearForm();
-        provider.loadConsultationPatients();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final provider = context.read<PrescriptionProvider>();
+      final camp = context.read<CampProvider>();
+      provider.clearForm();
+      if (camp.isCampMode && camp.campId != null) {
+        await provider.loadCampPatients(camp.campId!);
+      } else {
+        await provider.loadConsultationPatients();
         provider.prefillMrPrefix();
+      }
+      final mr = widget.initialMr?.trim();
+      if (mr != null && mr.isNotEmpty) {
+        await provider.searchPatient(mr);
       }
     });
   }
@@ -58,7 +68,10 @@ class _PrescriptionScreenState extends State<PrescriptionScreen>
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<PrescriptionProvider>();
+    final camp = context.watch<CampProvider>();
     final isMobile = MediaQuery.of(context).size.width < 900;
+    final sidebarTitle =
+        camp.isCampMode ? 'Camp Patients' : 'Consultation Patients';
 
     return BaseScaffold(
       title: 'Prescription',
@@ -69,7 +82,11 @@ class _PrescriptionScreenState extends State<PrescriptionScreen>
           children: [
             Column(
               children: [
-                if (isMobile) const SharedConsultationDropdown(),
+                if (isMobile)
+                  SharedConsultationDropdown(
+                    patients: provider.consultationPatients,
+                    isLoading: provider.isLoadingPatients,
+                  ),
                 Expanded(
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -79,9 +96,16 @@ class _PrescriptionScreenState extends State<PrescriptionScreen>
                         child: _PrescriptionBody(tabController: _tabController, provider: provider),
                       ),
                       if (!isMobile)
-                        const Expanded(
+                        Expanded(
                           flex: 3,
-                          child: SharedConsultationSidebar(),
+                          child: SharedConsultationSidebar(
+                            sidebarTitle: sidebarTitle,
+                            emptyMessage: camp.isCampMode
+                                ? 'No camp patients yet'
+                                : null,
+                            patients: provider.consultationPatients,
+                            isLoading: provider.isLoadingPatients,
+                          ),
                         ),
                     ],
                   ),

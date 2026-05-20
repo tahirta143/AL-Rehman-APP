@@ -5,6 +5,8 @@ import '../../core/services/connectivity_service.dart';
 import '../../custum widgets/drawer/base_scaffold.dart';
 import '../../models/mr_model/mr_patient_model.dart';
 import '../../providers/mr_provider/mr_provider.dart';
+import '../../providers/camp_provider.dart';
+import '../prescription/vitals.dart';
 import '../../core/providers/permission_provider.dart';
 import '../../core/permissions/permission_keys.dart';
 import '../../custum widgets/custom_loader.dart';
@@ -358,10 +360,58 @@ class _MrDetailsBodyState extends State<_MrDetailsBody>
 
   Future<void> _onSave() async {
     if (!_formKey.currentState!.validate()) return;
-    
+
     final prov = context.read<MrProvider>();
+    final camp = context.read<CampProvider>();
     final messenger = ScaffoldMessenger.of(context);
-    
+
+    final dobStr = _dob != null
+        ? "${_dob!.day.toString().padLeft(2, '0')}/${_dob!.month.toString().padLeft(2, '0')}/${_dob!.year}"
+        : '';
+
+    if (camp.isCampMode && _isNewPatient) {
+      final payload = {
+        'first_name': _firstCtrl.text.trim().toUpperCase(),
+        'last_name': _lastCtrl.text.trim().toUpperCase(),
+        'guardian_name': _guardianCtrl.text.trim().isEmpty
+            ? null
+            : _guardianCtrl.text.trim(),
+        'guardian_relation': _relation,
+        'gender': _gender,
+        'dob': dobStr.isEmpty ? null : _convertDobForApi(dobStr),
+        'age': int.tryParse(_ageCtrl.text),
+        'phone': _phoneCtrl.text.trim(),
+        'whatsapp_no': _whatsappCtrl.text.trim().isEmpty
+            ? null
+            : _whatsappCtrl.text.trim(),
+        'email': _emailCtrl.text.trim().isEmpty ? null : _emailCtrl.text.trim(),
+        'cnic': _cnicCtrl.text.trim().isEmpty ? null : _cnicCtrl.text.trim(),
+        'address': _addrCtrl.text.trim().isEmpty ? null : _addrCtrl.text.trim(),
+        'city': _cityCtrl.text.trim().isEmpty ? null : _cityCtrl.text.trim(),
+        'blood_group':
+            _bloodGroup.isEmpty ? null : _bloodGroup,
+        'profession':
+            _profCtrl.text.trim().isEmpty ? null : _profCtrl.text.trim(),
+        'education':
+            _eduCtrl.text.trim().isEmpty ? null : _eduCtrl.text.trim(),
+      };
+      final result = await camp.registerCampPatient(payload);
+      if (!mounted) return;
+      if (result.success) {
+        final savedMr = result.mrNumber ?? _mrCtrl.text;
+        messenger.hideCurrentSnackBar();
+        _snack('Patient Registered Successfully!');
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => VitalsScreen(initialMr: savedMr),
+          ),
+        );
+      } else {
+        _snack(result.message ?? 'Failed to register patient');
+      }
+      return;
+    }
+
     final patient = await prov.registerPatient(
       mrNumber: _mrCtrl.text,
       firstName: _firstCtrl.text,
@@ -369,9 +419,7 @@ class _MrDetailsBodyState extends State<_MrDetailsBody>
       guardianName: _guardianCtrl.text,
       relation: _relation,
       gender: _gender,
-      dateOfBirth: _dob != null
-          ? "${_dob!.day.toString().padLeft(2, '0')}/${_dob!.month.toString().padLeft(2, '0')}/${_dob!.year}"
-          : '',
+      dateOfBirth: dobStr,
       age: int.tryParse(_ageCtrl.text),
       bloodGroup: _bloodGroup,
       profession: _profCtrl.text,
@@ -389,10 +437,9 @@ class _MrDetailsBodyState extends State<_MrDetailsBody>
         messenger.hideCurrentSnackBar();
         _snack('Patient Registered Successfully!');
       }
-      
-      // Auto-refresh for NEXT patient if this was a new registration
+
       if (_isNewPatient) {
-        _clearPatient(); // This will fetchNextMR and clear fields
+        _clearPatient();
       } else {
         if (mounted) {
           setState(() {
@@ -409,6 +456,16 @@ class _MrDetailsBodyState extends State<_MrDetailsBody>
     }
   }
 
+  String? _convertDobForApi(String date) {
+    try {
+      final parts = date.split('/');
+      if (parts.length == 3) {
+        return '${parts[2]}-${parts[1].padLeft(2, '0')}-${parts[0].padLeft(2, '0')}';
+      }
+    } catch (_) {}
+    return null;
+  }
+
   void _onSearchChanged(String q) {
     _debounce?.cancel();
     if (q.trim().length < 2) {
@@ -420,7 +477,10 @@ class _MrDetailsBodyState extends State<_MrDetailsBody>
     }
     setState(() => _isSearching = true);
     _debounce = Timer(const Duration(milliseconds: 500), () async {
-      final results = await context.read<MrProvider>().searchPatients(q);
+      final camp = context.read<CampProvider>();
+      final results = camp.isCampMode
+          ? await camp.searchCampPatients(q)
+          : await context.read<MrProvider>().searchPatients(q);
       if (mounted) {
         setState(() {
           _searchResults = results;

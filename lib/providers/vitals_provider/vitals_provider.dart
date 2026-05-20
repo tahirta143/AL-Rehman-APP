@@ -5,6 +5,7 @@ import '../../core/utils/database_helper.dart';
 import '../../core/services/mr_api_service.dart';
 import '../../core/services/prescription_api_service.dart';
 import '../../core/services/vitals_api_service.dart';
+import '../../core/services/camp_sync_service.dart';
 import '../../models/mr_model/mr_patient_model.dart';
 import '../../models/vitals_model/vitals_model.dart';
 import 'dart:convert';
@@ -17,6 +18,7 @@ class VitalsProvider extends ChangeNotifier {
   final ConnectivityService _connectivity = ConnectivityService();
   final DatabaseHelper _db = DatabaseHelper();
   final AuthStorageService _storage = AuthStorageService();
+  final CampSyncService _campSync = CampSyncService();
 
   bool _isLoading = false;
   bool _isSaving = false;
@@ -322,6 +324,39 @@ class VitalsProvider extends ChangeNotifier {
   void setPainScale(int val) {
     _painScale = val;
     notifyListeners();
+  }
+
+  Future<void> fetchCampPatients(String campId) async {
+    _isLoadingConsultations = true;
+    notifyListeners();
+    try {
+      final result = await _campSync.fetchWebCampPatients(campId: campId, limit: 200);
+      if (result['success'] == true) {
+        final data = result['data'];
+        final patients = data is Map ? (data['patients'] as List? ?? []) : [];
+        _consultationPatients = patients.map((patient) {
+          final p = patient as Map<String, dynamic>;
+          final name = p['patient_name']?.toString() ??
+              '${p['first_name'] ?? ''} ${p['last_name'] ?? ''}'.trim();
+          return {
+            'srl_no': p['id'] ?? p['mr_number'],
+            'patient_mr_number': p['mr_number'],
+            'receipt_id': '',
+            'patient_name': name,
+            'service_detail': p['last_vitals_at'] != null
+                ? 'Vitals recorded'
+                : 'Camp patient',
+            'doctor_name': '',
+            'token_number': null,
+          };
+        }).toList();
+      }
+    } catch (e) {
+      debugPrint('Error camp patients: $e');
+    } finally {
+      _isLoadingConsultations = false;
+      notifyListeners();
+    }
   }
 
   // ─── Consultation Patients ─────────────────────────────────────────

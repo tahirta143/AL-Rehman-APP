@@ -203,6 +203,7 @@ class Perm {
   static const campDashboardDelete = 'CAMPS.DASHBOARD.DELETE';
   static const campSessionCreate   = 'CAMPS.SESSION.CREATE';
   static const campSessionUpdate   = 'CAMPS.SESSION.UPDATE';
+  static const campWebLoginAccess    = 'CAMPS.WEB_LOGIN.ACCESS';
 
   /// Super Admin wildcard — matches everything
   static const wildcard = '*';

@@ -31,6 +31,7 @@ class AuthStorageService {
   static const _keyPermVersion = 'permissions_version';
   static const _keyGroups      = 'user_groups';
   static const _keyCampToken    = 'camp_device_token';
+  static const _keyActiveCamp   = 'active_camp';
 
   // ─── Save after login ───────────────────────────────────────────────
   Future<void> saveLoginData({
@@ -109,5 +110,35 @@ class AuthStorageService {
 
   Future<void> clearCampToken() async {
     await _storage.delete(key: _keyCampToken);
+  }
+
+  Future<void> saveActiveCamp(Map<String, dynamic> camp) async {
+    await _storage.write(key: _keyActiveCamp, value: jsonEncode(camp));
+  }
+
+  Future<Map<String, dynamic>?> getActiveCamp() async {
+    final raw = await _safeRead(_keyActiveCamp);
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      return Map<String, dynamic>.from(jsonDecode(raw) as Map);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> clearActiveCamp() async {
+    await _storage.delete(key: _keyActiveCamp);
+  }
+
+  static String campJoinDismissKey(String userId) =>
+      'camp_join_dismissed_$userId';
+
+  Future<bool> isCampJoinDismissed(String userId) async {
+    final v = await _safeRead(campJoinDismissKey(userId));
+    return v == '1';
+  }
+
+  Future<void> setCampJoinDismissed(String userId) async {
+    await _storage.write(key: campJoinDismissKey(userId), value: '1');
   }
 }

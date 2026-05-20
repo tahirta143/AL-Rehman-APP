@@ -582,15 +582,12 @@ class _SyncDashboardBodyState extends State<_SyncDashboardBody> {
   void _showCreateSessionDialog(BuildContext context, SyncProvider prov) {
     final nameCtrl = TextEditingController();
     final locCtrl = TextEditingController();
-    final passCtrl = TextEditingController();
-    final mrPrefixCtrl = TextEditingController();
-    final limitCtrl = TextEditingController(text: '5');
 
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('New Camp Session'),
+        title: const Text('Add Camp'),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -612,47 +609,6 @@ class _SyncDashboardBodyState extends State<_SyncDashboardBody> {
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: mrPrefixCtrl, 
-                      textCapitalization: TextCapitalization.characters,
-                      decoration: InputDecoration(
-                        labelText: 'MR Prefix',
-                        prefixIcon: const Icon(Icons.tag_rounded),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        hintText: 'e.g. CAMP1',
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  SizedBox(
-                    width: 100,
-                    child: TextField(
-                      controller: limitCtrl, 
-                      keyboardType: TextInputType.number,
-                      decoration: InputDecoration(
-                        labelText: 'Limit *',
-                        prefixIcon: const Icon(Icons.smartphone_rounded),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: passCtrl, 
-                obscureText: true,
-                decoration: InputDecoration(
-                  labelText: 'Sync Password *',
-                  prefixIcon: const Icon(Icons.lock_outline_rounded),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  helperText: 'Required for device connection',
-                ),
-              ),
             ],
           ),
         ),
@@ -660,17 +616,14 @@ class _SyncDashboardBodyState extends State<_SyncDashboardBody> {
           TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () async {
-              if (nameCtrl.text.isEmpty || passCtrl.text.isEmpty) return;
+              if (nameCtrl.text.trim().isEmpty) return;
               
               Navigator.pop(dialogContext); // Close dialog
               _showLoadingOverlay(context);
               
-              final result = await prov.createSession(
-                name: nameCtrl.text,
-                location: locCtrl.text,
-                password: passCtrl.text,
-                mrPrefix: mrPrefixCtrl.text,
-                deviceLimit: int.tryParse(limitCtrl.text) ?? 5,
+              final result = await prov.createSessionSimple(
+                name: nameCtrl.text.trim(),
+                location: locCtrl.text.trim(),
               ); 
               
               if (!mounted) return;

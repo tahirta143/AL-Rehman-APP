@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:hims_app/custum%20widgets/drawer/base_scaffold.dart';
 import 'package:hims_app/providers/vitals_provider/vitals_provider.dart';
 import 'package:provider/provider.dart';
+import '../../providers/camp_provider.dart';
+import 'prescription.dart';
 import 'widgets/shared_consultation_widgets.dart';
 
 // ─── Hims Teal Design System ──────────────────────────────────────────────
@@ -20,7 +22,8 @@ const kCardShadow = [
 ];
 
 class VitalsScreen extends StatefulWidget {
-  const VitalsScreen({super.key});
+  final String? initialMr;
+  const VitalsScreen({super.key, this.initialMr});
 
   @override
   State<VitalsScreen> createState() => _VitalsScreenState();
@@ -32,10 +35,20 @@ class _VitalsScreenState extends State<VitalsScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       final provider = context.read<VitalsProvider>();
+      final camp = context.read<CampProvider>();
       provider.clearForm();
-      provider.fetchConsultationPatients();
+      if (camp.isCampMode && camp.campId != null) {
+        await provider.fetchCampPatients(camp.campId!);
+      } else {
+        await provider.fetchConsultationPatients();
+      }
+      final mr = widget.initialMr?.trim();
+      if (mr != null && mr.isNotEmpty) {
+        _mrSearchCtrl.text = mr;
+        await provider.searchPatient(mr);
+      }
     });
   }
 
@@ -48,7 +61,11 @@ class _VitalsScreenState extends State<VitalsScreen> {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<VitalsProvider>();
+    final camp = context.watch<CampProvider>();
+    final isCampMode = camp.isCampMode;
     final isTablet = MediaQuery.of(context).size.width > 1024;
+    final sidebarTitle =
+        isCampMode ? 'Camp Patients' : 'Consultation Patients';
 
     return BaseScaffold(
       title: 'Patient Vitals',
@@ -103,6 +120,8 @@ class _VitalsScreenState extends State<VitalsScreen> {
 
             // ── Desktop Consultation Sidebar ─────────────────────────────────
             if (isTablet) SharedConsultationSidebar(
+              sidebarTitle: sidebarTitle,
+              emptyMessage: isCampMode ? 'No camp patients yet' : null,
               patients: provider.consultationPatients,
               isLoading: provider.isLoadingConsultations,
               onSelect: (p) => provider.searchPatient(
@@ -656,14 +675,28 @@ class _SaveSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isCampMode = context.watch<CampProvider>().isCampMode;
     return SizedBox(
       width: double.infinity,
       height: 50,
       child: ElevatedButton.icon(
         onPressed: provider.isSaving ? null : () async {
           final s = await provider.saveVitals();
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s ? 'Vitals saved successfully' : 'Failed to save'), backgroundColor: s ? Colors.green : Colors.red, behavior: SnackBarBehavior.floating));
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(s ? 'Vitals saved successfully' : 'Failed to save'),
+              backgroundColor: s ? Colors.green : Colors.red,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+          if (s && isCampMode && provider.currentPatient?.mrNumber != null) {
+            final mr = provider.currentPatient!.mrNumber;
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => PrescriptionScreen(initialMr: mr),
+              ),
+            );
           }
         },
         icon: provider.isSaving ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: kWhite, strokeWidth: 2)) : const Icon(Icons.check_circle_outline_rounded),

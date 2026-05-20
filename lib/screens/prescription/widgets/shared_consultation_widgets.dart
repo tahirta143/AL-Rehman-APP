@@ -18,6 +18,8 @@ class SharedConsultationSidebar extends StatelessWidget {
   final Function(dynamic)? onSelect;
   final List<dynamic>? patients;
   final bool? isLoading;
+  final String? sidebarTitle;
+  final String? emptyMessage;
 
   const SharedConsultationSidebar({
     super.key,
@@ -25,6 +27,8 @@ class SharedConsultationSidebar extends StatelessWidget {
     this.onSelect,
     this.patients,
     this.isLoading,
+    this.sidebarTitle,
+    this.emptyMessage,
   });
 
   @override
@@ -66,9 +70,9 @@ class SharedConsultationSidebar extends StatelessWidget {
               children: [
                 const Icon(Icons.assignment_ind, color: kWhite, size: 16),
                 const SizedBox(width: 8),
-                const Text(
-                  'Consultation Patients',
-                  style: TextStyle(
+                Text(
+                  sidebarTitle ?? 'Consultation Patients',
+                  style: const TextStyle(
                     color: kWhite,
                     fontWeight: FontWeight.bold,
                     fontSize: 13,

@@ -4,6 +4,7 @@ import 'package:hims_app/core/providers/permission_provider.dart';
 import 'package:hims_app/core/services/auth_storage_service.dart';
 import 'package:hims_app/screens/auth/login.dart';
 import 'package:provider/provider.dart';
+import 'package:hims_app/providers/camp_provider.dart';
 
 class CustomDrawer extends StatefulWidget {
   final Function(int) onMenuItemTap;
@@ -49,6 +50,7 @@ class _CustomDrawerState extends State<CustomDrawer> {
 
   Future<void> _handleLogout(BuildContext context) async {
     context.read<PermissionProvider>().clear();
+    await context.read<CampProvider>().exitCamp();
     await AuthStorageService().clearAll();
     if (!context.mounted) return;
     Navigator.pushAndRemoveUntil(
@@ -63,6 +65,8 @@ class _CustomDrawerState extends State<CustomDrawer> {
     final double screenHeight = MediaQuery.of(context).size.height;
     final double topPadding = MediaQuery.of(context).padding.top;
     final perm = context.watch<PermissionProvider>();
+    final camp = context.watch<CampProvider>();
+    final isCampMode = camp.isCampMode;
 
     // ── Visible OPD sub-items based on permissions ──────────────────────────
     final List<_DrawerItemData> opdItems = [
@@ -146,11 +150,11 @@ class _CustomDrawerState extends State<CustomDrawer> {
         Perm.eyeMedicinesUpdate,
         Perm.eyeHistoryRead,
       ]))
-        const _DrawerItemData(
-          icon: Icons.remove_red_eye_outlined,
-          title: 'Eye Prescription',
-          index: 12,
-        ),
+        // const _DrawerItemData(
+        //   icon: Icons.remove_red_eye_outlined,
+        //   title: 'Eye Prescription',
+        //   index: 12,
+        // ),
       // FIX: each sub-screen uses its own specific permission key (matches React)
       if (perm.canAny([Perm.vitalsRead, Perm.vitalsCreate]))
         const _DrawerItemData(
@@ -271,9 +275,13 @@ class _CustomDrawerState extends State<CustomDrawer> {
                     ),
                   ),
                   const SizedBox(height: 2),
-                  const Text(
-                    'Hospital Management System',
-                    style: TextStyle(color: Colors.white70, fontSize: 13),
+                  Text(
+                    isCampMode
+                        ? '${camp.campDisplayName}${camp.campLocation.isNotEmpty ? ' • ${camp.campLocation}' : ''}'
+                        : 'Hospital Management System',
+                    style: const TextStyle(color: Colors.white70, fontSize: 13),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
@@ -283,7 +291,9 @@ class _CustomDrawerState extends State<CustomDrawer> {
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.symmetric(vertical: 8),
-                children: [
+                children: isCampMode
+                    ? _buildCampModeMenu(context, perm, camp)
+                    : [
                   _buildDrawerItem(
                     icon: Icons.home_rounded,
                     title: 'Home',
@@ -440,6 +450,67 @@ class _CustomDrawerState extends State<CustomDrawer> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  List<Widget> _buildCampModeMenu(
+    BuildContext context,
+    PermissionProvider perm,
+    CampProvider camp,
+  ) {
+    return [
+      if (perm.canAny([Perm.mrRead, Perm.mrCreate]))
+        _buildDrawerItem(
+          icon: Icons.person_outline_rounded,
+          title: 'MR Details',
+          index: 8,
+        ),
+      if (perm.hasResource('PRESCRIPTION.VITALS'))
+        _buildDrawerItem(
+          icon: Icons.monitor_heart_outlined,
+          title: 'Vitals',
+          index: 13,
+        ),
+      if (perm.hasResource('PRESCRIPTION.GP_RECORD'))
+        _buildDrawerItem(
+          icon: Icons.medication_outlined,
+          title: 'Prescription',
+          index: 9,
+        ),
+      const Divider(height: 24),
+      _buildExitCampItem(context, camp),
+    ];
+  }
+
+  Widget _buildExitCampItem(BuildContext context, CampProvider camp) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+      child: ListTile(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.orange.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: const Icon(Icons.exit_to_app_rounded, color: Colors.orange, size: 20),
+        ),
+        title: const Text(
+          'Exit Camp',
+          style: TextStyle(
+            color: Colors.orange,
+            fontWeight: FontWeight.w600,
+            fontSize: 14,
+          ),
+        ),
+        onTap: () async {
+          Navigator.pop(context);
+          await camp.exitCamp();
+          if (context.mounted) {
+            widget.onMenuItemTap(21);
+          }
+        },
       ),
     );
   }

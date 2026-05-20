@@ -282,6 +282,116 @@ class CampSyncService {
     }
   }
 
+  // ─── Web camp mode (staff JWT, no device password) ───────────────
+  Future<Map<String, dynamic>> fetchWebAvailableCamps() async {
+    try {
+      final headers = await _authHeaders();
+      final url = '${GlobalApi.baseUrl}/camp-sync/web/available-camps';
+      final response = await http
+          .get(Uri.parse(url), headers: headers)
+          .timeout(const Duration(seconds: 15));
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+      return {
+        'success': false,
+        'message': 'Failed to fetch camps: ${response.statusCode}',
+      };
+    } catch (e) {
+      return {'success': false, 'message': 'Fetch camps error: $e'};
+    }
+  }
+
+  Future<Map<String, dynamic>> webSelectCamp(String campId) async {
+    try {
+      final headers = await _authHeaders();
+      final url = '${GlobalApi.baseUrl}/camp-sync/web/select-camp';
+      final response = await http
+          .post(
+            Uri.parse(url),
+            headers: headers,
+            body: jsonEncode({'camp_id': campId}),
+          )
+          .timeout(const Duration(seconds: 15));
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return data;
+      }
+      return {
+        'success': false,
+        'message': data['message'] ?? 'Camp selection failed',
+      };
+    } catch (e) {
+      return {'success': false, 'message': 'Select camp error: $e'};
+    }
+  }
+
+  Future<Map<String, dynamic>> fetchWebCampPatients({
+    required String campId,
+    int limit = 200,
+  }) async {
+    try {
+      final headers = await _authHeaders();
+      final uri = Uri.parse('${GlobalApi.baseUrl}/camp-sync/web/patients')
+          .replace(queryParameters: {
+        'camp_id': campId,
+        'limit': limit.toString(),
+      });
+      final response = await http
+          .get(uri, headers: headers)
+          .timeout(const Duration(seconds: 15));
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+      return {
+        'success': false,
+        'message': 'Failed to fetch camp patients: ${response.statusCode}',
+      };
+    } catch (e) {
+      return {'success': false, 'message': 'Camp patients error: $e'};
+    }
+  }
+
+  Future<Map<String, dynamic>> createWebCampPatient({
+    required Map<String, dynamic> payload,
+  }) async {
+    try {
+      final headers = await _authHeaders();
+      final url = '${GlobalApi.baseUrl}/camp-sync/web/patients';
+      final response = await http
+          .post(
+            Uri.parse(url),
+            headers: headers,
+            body: jsonEncode(payload),
+          )
+          .timeout(const Duration(seconds: 15));
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return data;
+      }
+      return {
+        'success': false,
+        'message': data['message'] ?? 'Registration failed',
+      };
+    } catch (e) {
+      return {'success': false, 'message': 'Camp patient error: $e'};
+    }
+  }
+
+  /// Create camp with name + location only (matches React CampDashboard).
+  Future<Map<String, dynamic>> createSessionSimple({
+    required String name,
+    required String location,
+  }) async {
+    return createSession(
+      name: name,
+      location: location,
+      password: '',
+      mrPrefix: '',
+      deviceLimit: 5,
+    );
+  }
+
   // ─── Fetch Available Camps ───────────────────────────────────────
   Future<Map<String, dynamic>> fetchAvailableCamps() async {
     try {

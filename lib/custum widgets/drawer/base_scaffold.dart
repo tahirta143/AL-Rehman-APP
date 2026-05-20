@@ -32,6 +32,7 @@ import '../../screens/sync/sync_dashboard.dart';
 import '../../screens/mr_details/mr_view/mr_view.dart';
 import '../../screens/complaints/complaints_board_screen.dart';
 import '../../custum widgets/search/global_search_overlay.dart';
+import '../../providers/camp_provider.dart';
 
 
 // ─── FIX: Convert BaseScaffold from StatelessWidget to StatefulWidget ─────────
@@ -199,6 +200,9 @@ class _BaseScaffoldState extends State<BaseScaffold> {
 
   Widget _buildHeader(
       BuildContext context, GlobalKey<ScaffoldState> scaffoldKey) {
+    final camp = context.watch<CampProvider>();
+    final isCampMode = camp.isCampMode;
+
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -237,28 +241,71 @@ class _BaseScaffoldState extends State<BaseScaffold> {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: Text(
-                  widget.title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isCampMode ? camp.campDisplayName : widget.title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (isCampMode && camp.campLocation.isNotEmpty)
+                      Text(
+                        camp.campLocation,
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.85),
+                          fontSize: 12,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
                 ),
               ),
-              // Global Search Button
-              GestureDetector(
-                onTap: () => showGlobalSearchOverlay(context),
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(10),
+              if (!isCampMode)
+                GestureDetector(
+                  onTap: () => showGlobalSearchOverlay(context),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.search_rounded,
+                        color: Colors.white, size: 22),
                   ),
-                  child: const Icon(Icons.search_rounded,
-                      color: Colors.white, size: 22),
                 ),
-              ),
+              if (isCampMode) ...[
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: () async {
+                    await camp.exitCamp();
+                    if (context.mounted) {
+                      _navigateToScreen(context, 21, addToHistory: false);
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Text(
+                      'Exit Camp',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(width: 8),
               if (widget.actions != null) ...widget.actions!,
               if (widget.showNotificationIcon && widget.actions == null) ...[
@@ -272,8 +319,8 @@ class _BaseScaffoldState extends State<BaseScaffold> {
                       color: Colors.white, size: 22),
                 ),
               ],
-              const SizedBox(width: 8),
-              const SyncIndicator(),
+              // const SizedBox(width: 8),
+              // const SyncIndicator(),
             ],
           ),
           if (widget.title == 'Dashboard')

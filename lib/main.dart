@@ -21,6 +21,7 @@ import 'package:hims_app/providers/nutrition_provider/nutrition_provider.dart';
 import 'package:hims_app/providers/eye_provider/fundus_provider.dart';
 import 'package:hims_app/providers/pharmacy_provider/pharmacy_provider.dart';
 import 'package:hims_app/providers/sync_provider.dart';
+import 'package:hims_app/providers/camp_provider.dart';
 import 'package:hims_app/screens/main_shell.dart';
 import 'package:provider/provider.dart';
 import 'package:animations/animations.dart';
@@ -64,6 +65,9 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => PharmacyProvider()),
         ChangeNotifierProvider(create: (_) => SyncProvider()),
         ChangeNotifierProvider(create: (_) => OfflineDashboardProvider()),
+        ChangeNotifierProvider(
+          create: (_) => CampProvider()..initialize(),
+        ),
       ],
       child: MaterialApp(
         title: 'Waseela Diabesity',
