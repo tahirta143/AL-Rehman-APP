@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../core/providers/permission_provider.dart';
-import '../core/services/auth_storage_service.dart';
-import '../core/permissions/permission_keys.dart';
 import '../providers/camp_provider.dart';
 import '../screens/mr_details/mr_details.dart';
 
@@ -22,11 +19,8 @@ class CampLoginModal extends StatefulWidget {
   });
 
   /// Opens the join-camp dialog (use from Home and other screens).
-  static void showJoinDialog(
-    BuildContext context, {
-    VoidCallback? onDismiss,
-  }) {
-    showCampJoinDialog(context, onDismiss: onDismiss);
+  static void showJoinDialog(BuildContext context) {
+    showCampJoinDialog(context);
   }
 
   @override
@@ -63,11 +57,24 @@ class _CampLoginModalState extends State<CampLoginModal> {
     });
     final camps = await context.read<CampProvider>().fetchAvailableCamps();
     if (mounted) {
+      // Filter by today's day — only show camps that include today or have no days set
+      final todayName = _todayDayName();
+      final filtered = camps.where((camp) {
+        final days = (camp['days'] ?? '').toString();
+        if (days.isEmpty) return true; // no restriction = every day
+        return days.split(',').map((d) => d.trim()).contains(todayName);
+      }).toList();
       setState(() {
-        _camps = camps;
+        _camps = filtered;
         _loadingCamps = false;
       });
     }
+  }
+
+  String _todayDayName() {
+    const names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    // DateTime.weekday: 1=Monday … 7=Sunday
+    return names[DateTime.now().weekday - 1];
   }
 
   Future<void> _submit() async {
@@ -96,10 +103,6 @@ class _CampLoginModalState extends State<CampLoginModal> {
   @override
   Widget build(BuildContext context) {
     if (!widget.isOpen) return const SizedBox.shrink();
-
-    final perm = context.watch<PermissionProvider>();
-    final canJoin = perm.isAdmin || perm.can(Perm.campWebLoginAccess);
-    if (!canJoin) return const SizedBox.shrink();
 
     final card = Container(
               width: widget.embeddedInDialog
@@ -191,8 +194,8 @@ class _CampLoginModalState extends State<CampLoginModal> {
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(color: Colors.amber.shade100),
                                 ),
-                                child: const Text(
-                                  'No active camps available at the moment.',
+                                child: Text(
+                                  'No active camps available for ${_todayDayName()}.',
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
                                     color: Color(0xFFB45309),
@@ -227,9 +230,17 @@ class _CampLoginModalState extends State<CampLoginModal> {
                                       final name =
                                           camp['camp_name'] ?? camp['name'] ?? 'Camp';
                                       final loc = camp['location']?.toString();
-                                      final label = loc != null && loc.isNotEmpty
+                                      final days = (camp['days'] ?? '').toString();
+                                      String label = loc != null && loc.isNotEmpty
                                           ? '$name - $loc'
                                           : name.toString();
+                                      if (days.isNotEmpty) {
+                                        final abbrs = days.split(',').map((d) {
+                                          const a = {'Monday':'Mon','Tuesday':'Tue','Wednesday':'Wed','Thursday':'Thu','Friday':'Fri','Saturday':'Sat','Sunday':'Sun'};
+                                          return a[d.trim()] ?? d.trim();
+                                        }).join(', ');
+                                        label = '$label ($abbrs)';
+                                      }
                                       return DropdownMenuItem(
                                         value: id,
                                         child: Text(label, overflow: TextOverflow.ellipsis),
@@ -304,30 +315,27 @@ class _CampLoginModalState extends State<CampLoginModal> {
   }
 }
 
-/// Shows join-camp modal once per session unless dismissed (React Home behavior).
+/// In-memory flag — shows the popup once per app session, resets on logout.
+bool _campJoinShownThisSession = false;
+
+/// Call on logout so the popup shows again on next login.
+void resetCampJoinSession() => _campJoinShownThisSession = false;
+
+/// Shows join-camp modal once per app session for ALL logged-in users.
+/// Matches React behavior: no permission check, anyone can join a camp.
 Future<void> maybeShowCampJoinPrompt(BuildContext context) async {
+  if (_campJoinShownThisSession) return;
+
   final camp = context.read<CampProvider>();
   if (camp.isCampMode || camp.loading) return;
 
-  final perm = context.read<PermissionProvider>();
-  if (!camp.canAccessCampMode(perm.isAdmin, perm.can)) return;
-
-  final userId =
-      (await AuthStorageService().getUserId()) ??
-      (await AuthStorageService().getUsername()) ??
-      'current';
-  if (await AuthStorageService().isCampJoinDismissed(userId)) return;
+  _campJoinShownThisSession = true;
 
   if (!context.mounted) return;
-  showCampJoinDialog(context, onDismiss: () async {
-    await AuthStorageService().setCampJoinDismissed(userId);
-  });
+  showCampJoinDialog(context);
 }
 
-void showCampJoinDialog(
-  BuildContext context, {
-  VoidCallback? onDismiss,
-}) {
+void showCampJoinDialog(BuildContext context) {
   showDialog(
     context: context,
     barrierDismissible: true,
@@ -336,10 +344,7 @@ void showCampJoinDialog(
       child: CampLoginModal(
         isOpen: true,
         embeddedInDialog: true,
-        onClose: () {
-          onDismiss?.call();
-          Navigator.of(ctx).pop();
-        },
+        onClose: () => Navigator.of(ctx).pop(),
       ),
     ),
   );

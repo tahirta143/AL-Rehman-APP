@@ -863,4 +863,58 @@ class CampSyncService {
       return {'success': false, 'message': 'Sync error: $e'};
     }
   }
+
+  // ─── Camp Admin API ──────────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> getCampStats() async {
+    try {
+      final headers = await _authHeaders();
+      final url = '${GlobalApi.baseUrl}/camp-sync/admin/stats';
+      final response = await http.get(Uri.parse(url), headers: headers).timeout(const Duration(seconds: 15));
+      if (response.statusCode == 200) return jsonDecode(response.body) as Map<String, dynamic>;
+      return {'success': false, 'message': 'Failed to fetch stats: ${response.statusCode}'};
+    } catch (e) {
+      return {'success': false, 'message': 'Stats error: $e'};
+    }
+  }
+
+  Future<Map<String, dynamic>> createCamp(Map<String, dynamic> data) async {
+    try {
+      final headers = await _authHeaders();
+      final url = '${GlobalApi.baseUrl}/camp-sync/sessions';
+      final body = {'id': _uuid.v4(), 'status': 'active', ...data};
+      final response = await http.post(Uri.parse(url), headers: headers, body: jsonEncode(body)).timeout(const Duration(seconds: 15));
+      final result = jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.statusCode == 200 || response.statusCode == 201) return result;
+      return {'success': false, 'message': result['message'] ?? 'Create failed'};
+    } catch (e) {
+      return {'success': false, 'message': 'Create error: $e'};
+    }
+  }
+
+  Future<Map<String, dynamic>> updateCamp(String campId, Map<String, dynamic> data) async {
+    try {
+      final headers = await _authHeaders();
+      final url = '${GlobalApi.baseUrl}/camp-sync/admin/sessions/$campId';
+      final response = await http.put(Uri.parse(url), headers: headers, body: jsonEncode(data)).timeout(const Duration(seconds: 15));
+      final result = jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.statusCode == 200 || response.statusCode == 201) return result;
+      return {'success': false, 'message': result['message'] ?? 'Update failed'};
+    } catch (e) {
+      return {'success': false, 'message': 'Update error: $e'};
+    }
+  }
+
+  Future<Map<String, dynamic>> deleteCamp(String campId) async {
+    try {
+      final headers = await _authHeaders();
+      final url = '${GlobalApi.baseUrl}/camp-sync/admin/sessions/$campId';
+      final response = await http.delete(Uri.parse(url), headers: headers).timeout(const Duration(seconds: 15));
+      final result = jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.statusCode == 200 || response.statusCode == 201) return result;
+      return {'success': false, 'message': result['message'] ?? 'Delete failed'};
+    } catch (e) {
+      return {'success': false, 'message': 'Delete error: $e'};
+    }
+  }
 }

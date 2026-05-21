@@ -111,7 +111,10 @@ class _MrDetailsBodyState extends State<_MrDetailsBody>
   String _relation = 'Parent';
   String _gender = 'Male';
   String _bloodGroup = '';
+  String? _selectedCampId;
   DateTime? _dob;
+
+  List<Map<String, dynamic>> _availableCamps = [];
 
   static const _relations = ['Parent', 'Spouse', 'Sibling', 'Child', 'Other'];
   static const _genders = ['Male', 'Female', 'Other'];
@@ -127,6 +130,11 @@ class _MrDetailsBodyState extends State<_MrDetailsBody>
 
     // Always fetch latest MR on entry
     context.read<MrProvider>().fetchNextMR();
+
+    // Fetch available camps for the dropdown
+    context.read<CampProvider>().fetchAvailableCamps().then((camps) {
+      if (mounted) setState(() => _availableCamps = camps);
+    });
 
     // Auto-sync Phone to WhatsApp (Follows if WhatsApp hasn't been manually changed)
     _lastSyncedPhone = _phoneCtrl.text;
@@ -242,7 +250,7 @@ class _MrDetailsBodyState extends State<_MrDetailsBody>
       return;
     }
 
-    final formatted = normalize && input.length < 5 ? input.padLeft(5, '0') : input;
+    final formatted = input;
     if (formatted != _mrCtrl.text) {
       _mrCtrl.text = formatted;
       _mrCtrl.selection = TextSelection.collapsed(offset: _mrCtrl.text.length);
@@ -336,6 +344,7 @@ class _MrDetailsBodyState extends State<_MrDetailsBody>
     _relation = p.relation;
     _gender = p.gender;
     _bloodGroup = p.bloodGroup;
+    _selectedCampId = null;
   }
 
   void _clearRegistrationFields() {
@@ -356,6 +365,7 @@ class _MrDetailsBodyState extends State<_MrDetailsBody>
     _relation = 'Parent';
     _gender = 'Male';
     _bloodGroup = '';
+    _selectedCampId = null;
   }
 
   Future<void> _onSave() async {
@@ -394,6 +404,7 @@ class _MrDetailsBodyState extends State<_MrDetailsBody>
             _profCtrl.text.trim().isEmpty ? null : _profCtrl.text.trim(),
         'education':
             _eduCtrl.text.trim().isEmpty ? null : _eduCtrl.text.trim(),
+        'camp_id': _selectedCampId,
       };
       final result = await camp.registerCampPatient(payload);
       if (!mounted) return;
@@ -796,6 +807,8 @@ class _MrDetailsBodyState extends State<_MrDetailsBody>
               _f(ctrl: _addrCtrl, label: 'Full Address', icon: Icons.location_on_outlined),
               const SizedBox(height: 16),
               _f(ctrl: _cityCtrl, label: 'City', icon: Icons.location_city_outlined),
+              const SizedBox(height: 16),
+              _campDropdown(),
               
               const SizedBox(height: 40),
               _formActions(),
@@ -856,6 +869,43 @@ class _MrDetailsBodyState extends State<_MrDetailsBody>
       )).toList());
     }
     return Row(children: children.map((c) => Expanded(child: Padding(padding: const EdgeInsets.only(right: 12), child: c))).toList());
+  }
+
+  Widget _campDropdown() {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const Padding(
+        padding: EdgeInsets.only(left: 4, bottom: 6),
+        child: Text('Registered Camp', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _textMid)),
+      ),
+      DropdownButtonFormField<String>(
+        value: _selectedCampId,
+        isExpanded: true,
+        hint: Row(children: [
+          Icon(Icons.festival_outlined, size: 16, color: _teal.withOpacity(0.5)),
+          const SizedBox(width: 8),
+          Text('None', style: TextStyle(color: Colors.grey.withOpacity(0.5), fontSize: 13)),
+        ]),
+        style: const TextStyle(fontSize: 14, color: _textDark, fontWeight: FontWeight.w500),
+        decoration: InputDecoration(
+          prefixIcon: Icon(Icons.festival_outlined, color: _teal.withOpacity(0.5), size: 18),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          filled: true,
+          fillColor: const Color(0xFFF8FAFB),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _teal, width: 1.5)),
+        ),
+        items: [
+          const DropdownMenuItem<String>(value: null, child: Text('None')),
+          ..._availableCamps.map((camp) {
+            final id = camp['id']?.toString() ?? '';
+            final name = (camp['camp_name'] ?? camp['name'] ?? '').toString();
+            return DropdownMenuItem<String>(value: id, child: Text(name));
+          }),
+        ],
+        onChanged: (v) => setState(() => _selectedCampId = v),
+      ),
+    ]);
   }
 
   Widget _formActions() {

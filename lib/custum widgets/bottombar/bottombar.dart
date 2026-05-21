@@ -37,12 +37,12 @@ class _CustomFluidBottomNavBarState extends State<CustomFluidBottomNavBar>
       drawerIndex: 0,
       permissions: [Perm.appDashboardRead],
     ),
-    _NavItemDef(
-      icon: Icons.warning_amber_rounded,
-      label: 'Emergency',
-      drawerIndex: 5,
-      permissions: [Perm.emergencyRead, Perm.emergencyCreate],
-    ),
+    // _NavItemDef(
+    //   icon: Icons.warning_amber_rounded,
+    //   label: 'Emergency',
+    //   drawerIndex: 5,
+    //   permissions: [Perm.emergencyRead, Perm.emergencyCreate],
+    // ),
     _NavItemDef(
       icon: Icons.chat_bubble_rounded,
       label: 'Consult',

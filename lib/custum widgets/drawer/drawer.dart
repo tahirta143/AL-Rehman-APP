@@ -5,6 +5,7 @@ import 'package:hims_app/core/services/auth_storage_service.dart';
 import 'package:hims_app/screens/auth/login.dart';
 import 'package:provider/provider.dart';
 import 'package:hims_app/providers/camp_provider.dart';
+import 'package:hims_app/custum widgets/camp_login_modal.dart';
 
 class CustomDrawer extends StatefulWidget {
   final Function(int) onMenuItemTap;
@@ -52,6 +53,7 @@ class _CustomDrawerState extends State<CustomDrawer> {
     context.read<PermissionProvider>().clear();
     await context.read<CampProvider>().exitCamp();
     await AuthStorageService().clearAll();
+    resetCampJoinSession(); // allow popup on next login
     if (!context.mounted) return;
     Navigator.pushAndRemoveUntil(
       context,
@@ -150,12 +152,11 @@ class _CustomDrawerState extends State<CustomDrawer> {
         Perm.eyeMedicinesUpdate,
         Perm.eyeHistoryRead,
       ]))
-        // const _DrawerItemData(
-        //   icon: Icons.remove_red_eye_outlined,
-        //   title: 'Eye Prescription',
-        //   index: 12,
-        // ),
-      // FIX: each sub-screen uses its own specific permission key (matches React)
+        const _DrawerItemData(
+          icon: Icons.remove_red_eye_outlined,
+          title: 'Eye Prescription',
+          index: 12,
+        ),
       if (perm.canAny([Perm.vitalsRead, Perm.vitalsCreate]))
         const _DrawerItemData(
           icon: Icons.monitor_heart_outlined,
@@ -321,20 +322,14 @@ class _CustomDrawerState extends State<CustomDrawer> {
                       index: 22,
                     ),
 
-                  // Sync Dashboard
-                  if (perm.can(Perm.campDashboardRead))
-                    _buildDrawerItem(
-                      icon: Icons.sync_rounded,
-                      title: 'Sync Dashboard',
-                      index: 100,
-                    ),
+                  // Sync Dashboard — removed (offline system removed)
 
-                  // Offline Dashboard
-                  if (perm.can(Perm.campDashboardRead))
+                  // Camp Sessions (create/edit/delete/view)
+                  if (perm.canAny([Perm.campSessionCreate, Perm.campSessionUpdate, Perm.campDashboardDelete, Perm.campDashboardRead, Perm.campWebLoginAccess]))
                     _buildDrawerItem(
-                      icon: Icons.offline_pin_rounded,
-                      title: 'Camp Dashboard',
-                      index: 101,
+                      icon: Icons.festival_outlined,
+                      title: 'Camp Sessions',
+                      index: 102,
                     ),
 
                   // Complaints Board
@@ -388,36 +383,36 @@ class _CustomDrawerState extends State<CustomDrawer> {
                       ),
                     ),
                   // ── Pharmacy Dropdown ──────────────────────────────────────────────
-                  if (pharmacyItems.isNotEmpty)
-                    _buildGroupHeader(
-                      icon: Icons.local_pharmacy_outlined,
-                      title: 'Pharmacy',
-                      isExpanded: _pharmacyExpanded,
-                      hasActiveChild: _pharmacyIndices.contains(
-                        widget.selectedIndex,
-                      ),
-                      onTap: () => setState(
-                        () => _pharmacyExpanded = !_pharmacyExpanded,
-                      ),
-                    ),
-                  if (_pharmacyExpanded)
-                    ...pharmacyItems.map(
-                      (item) => _buildSubDrawerItem(
-                        icon: item.icon,
-                        title: item.title,
-                        index: item.index,
-                      ),
-                    ),
+                  // if (pharmacyItems.isNotEmpty)
+                  //   _buildGroupHeader(
+                  //     icon: Icons.local_pharmacy_outlined,
+                  //     title: 'Pharmacy',
+                  //     isExpanded: _pharmacyExpanded,
+                  //     hasActiveChild: _pharmacyIndices.contains(
+                  //       widget.selectedIndex,
+                  //     ),
+                  //     onTap: () => setState(
+                  //       () => _pharmacyExpanded = !_pharmacyExpanded,
+                  //     ),
+                  //   ),
+                  // if (_pharmacyExpanded)
+                  //   ...pharmacyItems.map(
+                  //     (item) => _buildSubDrawerItem(
+                  //       icon: item.icon,
+                  //       title: item.title,
+                  //       index: item.index,
+                  //     ),
+                  //   ),
 
                   // Add Expenses — standalone
 
                   // Emergency Treatment — standalone
-                  if (perm.canAny([Perm.emergencyRead, Perm.emergencyCreate]))
-                    _buildDrawerItem(
-                      icon: Icons.emergency_rounded,
-                      title: 'Emergency Treatment',
-                      index: 5,
-                    ),
+                  // if (perm.canAny([Perm.emergencyRead, Perm.emergencyCreate]))
+                  //   _buildDrawerItem(
+                  //     icon: Icons.emergency_rounded,
+                  //     title: 'Emergency Treatment',
+                  //     index: 5,
+                  //   ),
 
                   // ── Reports Dropdown ───────────────────────────────────────
                   if (reportItems.isNotEmpty)

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hims_app/screens/mr_details/mr_view/mr_view.dart';
 import 'package:provider/provider.dart';
 import 'package:animate_do/animate_do.dart';
 import '../../core/providers/permission_provider.dart';
@@ -77,13 +78,12 @@ class _HomeBodyState extends State<_HomeBody> {
   Widget build(BuildContext context) {
     final perm = context.watch<PermissionProvider>();
     final camp = context.watch<CampProvider>();
-    final canAccessCamp = camp.canAccessCampMode(perm.isAdmin, perm.can);
     final user = perm.fullName ?? 'User';
     final role = perm.role ?? 'Staff';
 
     final List<_NavCard> allCards = [
       const _NavCard(label: "Dashboard", desc: "Analytics & reports", icon: Icons.bar_chart_rounded, drawerIndex: 0, permission: Perm.appDashboardRead),
-      const _NavCard(label: "Emergency", desc: "Treatment & queue", icon: Icons.error_outline_rounded, drawerIndex: 5, permission: Perm.emergencyRead),
+      // const _NavCard(label: "Emergency", desc: "Treatment & queue", icon: Icons.error_outline_rounded, drawerIndex: 5, permission: Perm.emergencyRead),
       const _NavCard(label: "OPD Receipt", desc: "Create new receipts", icon: Icons.receipt_rounded, drawerIndex: 3, permission: Perm.opdReceiptRead),
       const _NavCard(label: "Patient Records", desc: "View & manage records", icon: Icons.description_outlined, drawerIndex: 4, permission: Perm.opdPatientRead),
       const _NavCard(label: "MR Details", desc: "Patient master records", icon: Icons.person_outline_rounded, drawerIndex: 8, permission: Perm.mrRead),
@@ -136,7 +136,7 @@ class _HomeBodyState extends State<_HomeBody> {
                   // Spacer to push content below the fixed header and cards
                   SizedBox(height: size.height * 0.42 + 25),
 
-                  if (canAccessCamp && !camp.isCampMode) ...[
+                  if (!camp.isCampMode) ...[
                     Padding(
                       padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
                       child: _CampJoinBanner(
@@ -767,14 +767,15 @@ class _ModuleCard extends StatelessWidget {
   Widget _getScreen(int index) {
     switch (index) {
       case 0: return const dash.DashboardScreen();
-      case 5: return const EmergencyTreatmentScreen();
+      // case 5: return const EmergencyTreatmentScreen();
       case 3: return const OpdReceiptScreen();
       case 4: return const OpdRecordsScreen();
       case 8: return const MrDetailsScreen();
       case 1: return const ConsultationScreen();
       case 9: return const PrescriptionScreen();
-      // case 12: return const EyePrescriptionScreen();
+      case 12: return const EyePrescriptionScreen();
       case 13: return const VitalsScreen();
+      case 22: return const MrDataViewScreen();
       case 14: return const LabValuesScreen();
       case 15: return const NutritionScreen();
       case 16: return const FundusExaminationScreen();

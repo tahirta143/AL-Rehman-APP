@@ -33,6 +33,7 @@ import '../../screens/mr_details/mr_view/mr_view.dart';
 import '../../screens/complaints/complaints_board_screen.dart';
 import '../../custum widgets/search/global_search_overlay.dart';
 import '../../providers/camp_provider.dart';
+import '../../screens/camp/camp_dashboard_screen.dart';
 
 
 // ─── FIX: Convert BaseScaffold from StatelessWidget to StatefulWidget ─────────
@@ -438,6 +439,9 @@ class _BaseScaffoldState extends State<BaseScaffold> {
         break;
       case 101:
         screen = const OfflineDashboardScreen();
+        break;
+      case 102:
+        screen = const CampDashboardScreen();
         break;
       case -1:
         _showLogoutDialog(context);

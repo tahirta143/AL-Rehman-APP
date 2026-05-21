@@ -84,12 +84,6 @@ class _OpdReceiptScreenState extends State<OpdReceiptScreen> {
   @override
   void initState() {
     super.initState();
-    _mrNoFocusNode.addListener(() {
-      if (!_mrNoFocusNode.hasFocus) {
-        _padMr();
-      }
-    });
-
     // Always fetch latest MR on entry
     context.read<MrProvider>().fetchNextMR();
 
@@ -163,28 +157,51 @@ class _OpdReceiptScreenState extends State<OpdReceiptScreen> {
     }
   }
 
-  void _padMr() {
-    final raw = _mrNoCtrl.text.replaceAll(RegExp(r'[^0-9]'), '');
-    if (raw.isNotEmpty && raw.length < 5) {
-      final padded = raw.padLeft(5, '0');
-      _mrNoCtrl.text = padded;
-      _onMrChanged(padded);
+  void _onMrChanged(String val) async {
+    final input = val.trim();
+
+    if (input.isEmpty) {
+      _clearPatient();
+      return;
+    }
+
+    setState(() {
+      _isSearching = true;
+      _patientFound = false;
+      _patientNotFound = false;
+    });
+
+    final mrProv = Provider.of<MrProvider>(context, listen: false);
+    final patient = await mrProv.findByMrNumber(input, normalize: false);
+
+    if (!mounted) return;
+
+    setState(() { _isSearching = false; });
+
+    if (patient != null) {
+      setState(() {
+        _patientFound = true;
+        _patientNotFound = false;
+        _nameCtrl.text = '${patient.firstName} ${patient.lastName}'.trim();
+        _phoneCtrl.text = patient.phoneNumber;
+        _ageCtrl.text = patient.age?.toString() ?? '';
+        _genderCtrl.text = patient.gender;
+        _addressCtrl.text = patient.address;
+        _cityCtrl.text = patient.city;
+      });
+      _refreshAuxData();
+    } else {
+      setState(() {
+        _patientFound = false;
+        _patientNotFound = true;
+        _clearFields();
+      });
     }
   }
 
   @override
   void dispose() {
-    // Remove listener if screen is disposed before it was automatically removed
     context.read<MrProvider>().removeListener(_onMrProvChange);
-
-    _scrollController.dispose();
-    _mrNoCtrl.dispose();
-    _nameCtrl.dispose();
-    _phoneCtrl.dispose();
-    _ageCtrl.dispose();
-    _genderCtrl.dispose();
-    _addressCtrl.dispose();
-    _cityCtrl.dispose();
     _discountCtrl.dispose();
     _amountPaidCtrl.dispose();
     _mrNoFocusNode.dispose();
@@ -208,58 +225,6 @@ class _OpdReceiptScreenState extends State<OpdReceiptScreen> {
                 fontSize: 10, fontWeight: FontWeight.w600, color: fg)),
       ]),
     );
-  }
-
-  void _onMrChanged(String val) async {
-    final formatted = val.replaceAll(RegExp(r'[^0-9]'), '');
-
-    if (formatted.isEmpty) {
-      _clearPatient();
-      return;
-    }
-
-    if (formatted.isNotEmpty) {
-      setState(() {
-        _isSearching = true;
-        _patientFound = false;
-        _patientNotFound = false;
-      });
-
-      final mrProv = Provider.of<MrProvider>(context, listen: false);
-      final patient = await mrProv.findByMrNumber(formatted, normalize: false);
-
-      if (!mounted) return;
-
-      setState(() {
-        _isSearching = false;
-      });
-
-      if (patient != null) {
-        setState(() {
-          _patientFound = true;
-          _patientNotFound = false;
-          _nameCtrl.text = '${patient.firstName} ${patient.lastName}'.trim();
-          _phoneCtrl.text = patient.phoneNumber;
-          _ageCtrl.text = patient.age?.toString() ?? '';
-          _genderCtrl.text = patient.gender;
-          _addressCtrl.text = patient.address;
-          _cityCtrl.text = patient.city;
-        });
-        _refreshAuxData();
-      } else {
-        setState(() {
-          _patientFound = false;
-          _patientNotFound = true;
-          _clearFields();
-        });
-      }
-    } else {
-      setState(() {
-        _patientFound = false;
-        _patientNotFound = false;
-        _clearFields();
-      });
-    }
   }
 
   void _clearPatient() {
@@ -1110,7 +1075,7 @@ class _OpdReceiptScreenState extends State<OpdReceiptScreen> {
                   });
                 },
                 onFieldSubmitted: (val) {
-                  _padMr();
+                  _onMrChanged(val);
                 },
                 decoration: InputDecoration(
                   hintText: 'MR Number — auto or search',
