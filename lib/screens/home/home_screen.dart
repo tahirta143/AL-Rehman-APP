@@ -773,7 +773,7 @@ class _ModuleCard extends StatelessWidget {
       case 8: return const MrDetailsScreen();
       case 1: return const ConsultationScreen();
       case 9: return const PrescriptionScreen();
-      case 12: return const EyePrescriptionScreen();
+      // case 12: return const EyePrescriptionScreen();
       case 13: return const VitalsScreen();
       case 22: return const MrDataViewScreen();
       case 14: return const LabValuesScreen();

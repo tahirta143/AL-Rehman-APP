@@ -29,8 +29,8 @@ class _CustomDrawerState extends State<CustomDrawer> {
   static const List<int> _opdIndices = [1, 3, 4, 6, 7, 10];
   // Reports dropdown indices: 11
   static const List<int> _reportsIndices = [11];
-  // Prescription dropdown indices: 9, 12, 13, 14, 15, 16
-  static const List<int> _prescriptionIndices = [9, 12, 13, 14, 15, 16];
+  // Prescription dropdown indices: 9, 13, 14, 15, 16
+  static const List<int> _prescriptionIndices = [9, 13, 14, 15, 16];
   // Pharmacy dropdown indices: 17, 18, 19, 20
   static const List<int> _pharmacyIndices = [17, 18, 19, 20];
 
@@ -135,28 +135,28 @@ class _CustomDrawerState extends State<CustomDrawer> {
           title: 'Prescription GP',
           index: 9,
         ),
-      if (perm.canAny([
-        Perm.prescriptionRead,
-        Perm.prescriptionCreate,
-        Perm.eyeRecordRead,
-        Perm.eyeRecordUpdate,
-        Perm.eyeDiagnosisRead,
-        Perm.eyeDiagnosisUpdate,
-        Perm.eyeOptometristRead,
-        Perm.eyeOptometristUpdate,
-        Perm.eyeExaminationRead,
-        Perm.eyeExaminationUpdate,
-        Perm.eyeManagementRead,
-        Perm.eyeManagementUpdate,
-        Perm.eyeMedicinesRead,
-        Perm.eyeMedicinesUpdate,
-        Perm.eyeHistoryRead,
-      ]))
-        const _DrawerItemData(
-          icon: Icons.remove_red_eye_outlined,
-          title: 'Eye Prescription',
-          index: 12,
-        ),
+      // if (perm.canAny([
+      //   Perm.prescriptionRead,
+      //   Perm.prescriptionCreate,
+      //   Perm.eyeRecordRead,
+      //   Perm.eyeRecordUpdate,
+      //   Perm.eyeDiagnosisRead,
+      //   Perm.eyeDiagnosisUpdate,
+      //   Perm.eyeOptometristRead,
+      //   Perm.eyeOptometristUpdate,
+      //   Perm.eyeExaminationRead,
+      //   Perm.eyeExaminationUpdate,
+      //   Perm.eyeManagementRead,
+      //   Perm.eyeManagementUpdate,
+      //   Perm.eyeMedicinesRead,
+      //   Perm.eyeMedicinesUpdate,
+      //   Perm.eyeHistoryRead,
+      // ]))
+      //   const _DrawerItemData(
+      //     icon: Icons.remove_red_eye_outlined,
+      //     title: 'Eye Prescription',
+      //     index: 12,
+      //   ),
       if (perm.canAny([Perm.vitalsRead, Perm.vitalsCreate]))
         const _DrawerItemData(
           icon: Icons.monitor_heart_outlined,

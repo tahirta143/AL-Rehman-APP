@@ -165,10 +165,10 @@ class _CampLoginModalState extends State<CampLoginModal> {
                             ],
                           ),
                         ),
-                        IconButton(
-                          onPressed: widget.onClose,
-                          icon: const Icon(Icons.close, color: Color(0xFF94A3B8)),
-                        ),
+                        // IconButton(
+                        //   onPressed: widget.onClose,
+                        //   icon: const Icon(Icons.close, color: Color(0xFF94A3B8)),
+                        // ),
                       ],
                     ),
                   ),
@@ -259,7 +259,7 @@ class _CampLoginModalState extends State<CampLoginModal> {
                       children: [
                         TextButton(
                           onPressed: widget.onClose,
-                          child: const Text('Cancel'),
+                          child: const Text('Clinical Mood'),
                         ),
                         const SizedBox(width: 8),
                         ElevatedButton(
@@ -282,7 +282,7 @@ class _CampLoginModalState extends State<CampLoginModal> {
                                     color: Colors.white,
                                   ),
                                 )
-                              : const Text('Enter Camp Mode'),
+                              : const Text('Camp Mode'),
                         ),
                       ],
                     ),

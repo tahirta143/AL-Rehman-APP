@@ -531,7 +531,7 @@ class _PatientTableState extends State<_PatientTable> {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         child: const Row(
           children: [
-            _HeaderCell('#', flex: 1),
+            _HeaderCell('Camp', flex: 2),
             _HeaderCell('MR No', flex: 2),
             _HeaderCell('Patient Name', flex: 4),
             // _HeaderCell('Phone', flex: 3),
@@ -551,7 +551,7 @@ class _PatientTableState extends State<_PatientTable> {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         child: const Row(
           children: [
-            _HeaderCell('#', flex: 1),
+            _HeaderCell('Registered Camp', flex: 2),
             _HeaderCell('MR No', flex: 2),
             _HeaderCell('Patient', flex: 3),
             _HeaderCell('Guardian', flex: 2),
@@ -628,14 +628,16 @@ class _PatientRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       child: Row(
         children: [
-          // #
+          // Camp
           SizedBox(
-            width: 22,
+            width: 50,
             child: Text(
-              '$index',
-              style: const TextStyle(fontSize: 11, color: Color(0xFF718096)),
+              patient.campName.isEmpty ? 'None' : patient.campName,
+              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF718096)),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
+          const SizedBox(width: 4),
           // MR No
           SizedBox(
             width: 54,
@@ -735,9 +737,9 @@ class _PatientRow extends StatelessWidget {
           child: Row(
             children: [
               Expanded(
-                flex: 1,
-                child: Text('$index',
-                    style: const TextStyle(fontSize: 12, color: Color(0xFF718096))),
+                flex: 2,
+                child: Text(patient.campName.isEmpty ? 'None' : patient.campName,
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF4A5568))),
               ),
               Expanded(
                 flex: 2,

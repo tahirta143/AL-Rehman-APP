@@ -201,7 +201,12 @@ class _OpdReceiptScreenState extends State<OpdReceiptScreen> {
 
   @override
   void dispose() {
-    context.read<MrProvider>().removeListener(_onMrProvChange);
+    // Clear selected patient so it doesn't persist when coming back or going to other screens
+    final mrProv = context.read<MrProvider>();
+    mrProv.selectPatient(null);
+    mrProv.clearSearch();
+    
+    mrProv.removeListener(_onMrProvChange);
     _discountCtrl.dispose();
     _amountPaidCtrl.dispose();
     _mrNoFocusNode.dispose();

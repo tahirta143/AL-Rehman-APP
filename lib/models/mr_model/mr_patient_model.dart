@@ -58,6 +58,7 @@ class MrPatientApiModel {
   final String patientName;
   final String phoneNumber;
   final String? fatherHusbandName;
+  final String? campName;
   final List<VisitHistoryModel>? history;
 
   MrPatientApiModel({
@@ -86,6 +87,7 @@ class MrPatientApiModel {
     required this.patientName,
     required this.phoneNumber,
     this.fatherHusbandName,
+    this.campName,
     this.history,
   });
 
@@ -116,6 +118,7 @@ class MrPatientApiModel {
       patientName: (json['patient_name'] as String?) ?? (json['first_name'] as String?) ?? '',
       phoneNumber: (json['phone_number'] as String?) ?? (json['phone'] as String?) ?? '',
       fatherHusbandName: json['father_husband_name'] as String?,
+      campName: json['camp_name'] as String?,
       history: json['history'] != null
           ? (json['history'] as List)
               .map((i) => VisitHistoryModel.fromJson(i as Map<String, dynamic>))
@@ -208,6 +211,7 @@ class MrPatientApiModel {
       totalVisits: totalVisitsCount,
       visitsToday: visitsTodayCount,
       visitHistory: history,
+      campName: campName ?? '',
     );
   }
 }
@@ -231,6 +235,7 @@ class PatientModel {
   final String cnic;
   final String address;
   final String city;
+  final String campName;
   final DateTime registeredAt;
   int totalVisits;
   int visitsToday;
@@ -256,6 +261,7 @@ class PatientModel {
     this.cnic = '',
     this.address = '',
     this.city = '',
+    this.campName = '',
     required this.registeredAt,
     this.syncStatus,
     this.deviceUuid,
@@ -283,6 +289,7 @@ class PatientModel {
       cnic: p['cnic']?.toString() ?? '',
       address: p['address']?.toString() ?? '',
       city: p['city']?.toString() ?? '',
+      campName: (p['camp_name'] ?? '').toString(),
       registeredAt: DateTime.tryParse(p['created_at']?.toString() ?? '') ??
           DateTime.now(),
     );

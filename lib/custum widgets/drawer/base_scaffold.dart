@@ -32,6 +32,7 @@ import '../../screens/sync/sync_dashboard.dart';
 import '../../screens/mr_details/mr_view/mr_view.dart';
 import '../../screens/complaints/complaints_board_screen.dart';
 import '../../custum widgets/search/global_search_overlay.dart';
+import '../../providers/mr_provider/mr_provider.dart';
 import '../../providers/camp_provider.dart';
 import '../../screens/camp/camp_dashboard_screen.dart';
 
@@ -359,6 +360,16 @@ class _BaseScaffoldState extends State<BaseScaffold> {
       // but let's keep it for now as per "one step back" requirement.
     }
 
+    // Clear patient search state when navigating via general menus
+    // This fixes the issue of searched patients persisting across screens.
+    try {
+      final mrProv = Provider.of<MrProvider>(context, listen: false);
+      mrProv.selectPatient(null);
+      mrProv.clearSearch();
+    } catch (_) {
+      // MrProvider might not be available in some contexts, though unlikely here
+    }
+
     Widget screen;
 
     switch (index) {
@@ -392,9 +403,9 @@ class _BaseScaffoldState extends State<BaseScaffold> {
       case 9:
         screen = const PrescriptionScreen();
         break;
-      case 12:
-        screen = const EyePrescriptionScreen();
-        break;
+      // case 12:
+      //   screen = const EyePrescriptionScreen();
+      //   break;
       case 10:
         screen = const DiscountVoucherApprovalScreen();
         break;

@@ -216,6 +216,11 @@ class _MrDetailsBodyState extends State<_MrDetailsBody>
 
   @override
   void dispose() {
+    // Clear selected patient so it doesn't persist when coming back or going to other screens
+    final prov = context.read<MrProvider>();
+    prov.selectPatient(null);
+    prov.clearSearch();
+
     ConnectivityService().isOnline.removeListener(_onConnectivityChange);
     _debounce?.cancel();
     _tabController.dispose();
