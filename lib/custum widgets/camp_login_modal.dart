@@ -195,7 +195,7 @@ class _CampLoginModalState extends State<CampLoginModal> {
                                   border: Border.all(color: Colors.amber.shade100),
                                 ),
                                 child: Text(
-                                  'No active camps available for ${_todayDayName()}.',
+                                  'No active  ${_todayDayName()}.',
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
                                     color: Color(0xFFB45309),
