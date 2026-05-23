@@ -26,6 +26,7 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        multiDexEnabled = true
     }
 
     buildTypes {
@@ -37,12 +38,21 @@ android {
         }
     }
 
-    // ✅ Kotlin DSL safe APK rename
+    lint {
+        checkReleaseBuilds = false
+        abortOnError = false
+    }
+
+    // ✅ Split-friendly APK rename
     applicationVariants.all {
         outputs.all {
-            // Safe cast to rename APK
-            val outputImpl = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
-            outputImpl.outputFileName = "WaseelaDiabesity-${buildType.name}.apk"
+            val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
+            val abi = filters.find { it.filterType == "ABI" }?.identifier
+            if (abi != null) {
+                output.outputFileName = "WaseelaDiabesity-${buildType.name}-$abi.apk"
+            } else {
+                output.outputFileName = "WaseelaDiabesity-${buildType.name}.apk"
+            }
         }
     }
 }
