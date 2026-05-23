@@ -146,11 +146,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                 color: Colors.white.withOpacity(0.2),
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              child: Image.asset("assets/images/Waseelalogo.png")
+                              child: Image.asset("assets/images/eye4.png")
                             ),
                             const SizedBox(width: 10),
                             const Text(
-                              'Waseela Diabesity',
+                              'Al-Rehman Eye Hospital',
                               style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 15,

@@ -23,8 +23,8 @@ class _SplashScreenState extends State<SplashScreen>
   late Animation<double> _fadeAnimation;
   late Animation<double> _circleAnimation;
 
-  final String _companyName = 'WASEELA DIABESITY';
-  final String _logoAsset = 'assets/images/Waseelalogo.png';
+  final String _companyName = 'AL-Rehman Eye Hospital';
+  final String _logoAsset = 'assets/images/eye4.png';
 
   @override
   void initState() {

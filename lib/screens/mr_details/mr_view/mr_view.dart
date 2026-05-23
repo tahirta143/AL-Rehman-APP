@@ -531,7 +531,7 @@ class _PatientTableState extends State<_PatientTable> {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         child: const Row(
           children: [
-            _HeaderCell('Camp', flex: 2),
+            _HeaderCell('Sr #', flex: 1),
             _HeaderCell('MR No', flex: 2),
             _HeaderCell('Patient Name', flex: 4),
             // _HeaderCell('Phone', flex: 3),
@@ -551,7 +551,7 @@ class _PatientTableState extends State<_PatientTable> {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         child: const Row(
           children: [
-            _HeaderCell('Registered Camp', flex: 2),
+            _HeaderCell('Sr #', flex: 1),
             _HeaderCell('MR No', flex: 2),
             _HeaderCell('Patient', flex: 3),
             _HeaderCell('Guardian', flex: 2),
@@ -628,13 +628,12 @@ class _PatientRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       child: Row(
         children: [
-          // Camp
+          // Sr No
           SizedBox(
-            width: 50,
+            width: 30,
             child: Text(
-              patient.campName.isEmpty ? 'None' : patient.campName,
+              index.toString(),
               style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF718096)),
-              overflow: TextOverflow.ellipsis,
             ),
           ),
           const SizedBox(width: 4),
@@ -737,8 +736,8 @@ class _PatientRow extends StatelessWidget {
           child: Row(
             children: [
               Expanded(
-                flex: 2,
-                child: Text(patient.campName.isEmpty ? 'None' : patient.campName,
+                flex: 1,
+                child: Text(index.toString(),
                     style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF4A5568))),
               ),
               Expanded(

@@ -61,8 +61,7 @@ dev_dependencies:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/images/Waseelalogo.png"
-
+  image_path: "assets/images/eye4.png"
 flutter:
   uses-material-design: true
 

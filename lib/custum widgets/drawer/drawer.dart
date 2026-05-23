@@ -26,7 +26,7 @@ class CustomDrawer extends StatefulWidget {
 
 class _CustomDrawerState extends State<CustomDrawer> {
   // OPD dropdown indices: 1,3,4,6,7,10
-  static const List<int> _opdIndices = [1, 3, 4, 6, 7, 10];
+  static const List<int> _opdIndices = [ 3, 4, 6, 7, 10];
   // Reports dropdown indices: 11
   static const List<int> _reportsIndices = [11];
   // Prescription dropdown indices: 9, 13, 14, 15, 16
@@ -78,12 +78,12 @@ class _CustomDrawerState extends State<CustomDrawer> {
           title: 'OPD Receipt',
           index: 3,
         ),
-      if (perm.hasResource('APPOINTMENTS.APPOINTMENT'))
-        const _DrawerItemData(
-          icon: Icons.chat_bubble_outline_rounded,
-          title: 'Consultation Appointment',
-          index: 1,
-        ),
+      // if (perm.hasResource('APPOINTMENTS.APPOINTMENT'))
+      //   const _DrawerItemData(
+      //     icon: Icons.chat_bubble_outline_rounded,
+      //     title: 'Consultation Appointment',
+      //     index: 1,
+      //   ),
 
       if (perm.hasResource('OPD.PATIENT'))
         const _DrawerItemData(
@@ -135,28 +135,28 @@ class _CustomDrawerState extends State<CustomDrawer> {
           title: 'Prescription GP',
           index: 9,
         ),
-      // if (perm.canAny([
-      //   Perm.prescriptionRead,
-      //   Perm.prescriptionCreate,
-      //   Perm.eyeRecordRead,
-      //   Perm.eyeRecordUpdate,
-      //   Perm.eyeDiagnosisRead,
-      //   Perm.eyeDiagnosisUpdate,
-      //   Perm.eyeOptometristRead,
-      //   Perm.eyeOptometristUpdate,
-      //   Perm.eyeExaminationRead,
-      //   Perm.eyeExaminationUpdate,
-      //   Perm.eyeManagementRead,
-      //   Perm.eyeManagementUpdate,
-      //   Perm.eyeMedicinesRead,
-      //   Perm.eyeMedicinesUpdate,
-      //   Perm.eyeHistoryRead,
-      // ]))
-      //   const _DrawerItemData(
-      //     icon: Icons.remove_red_eye_outlined,
-      //     title: 'Eye Prescription',
-      //     index: 12,
-      //   ),
+      if (perm.canAny([
+        Perm.prescriptionRead,
+        Perm.prescriptionCreate,
+        Perm.eyeRecordRead,
+        Perm.eyeRecordUpdate,
+        Perm.eyeDiagnosisRead,
+        Perm.eyeDiagnosisUpdate,
+        Perm.eyeOptometristRead,
+        Perm.eyeOptometristUpdate,
+        Perm.eyeExaminationRead,
+        Perm.eyeExaminationUpdate,
+        Perm.eyeManagementRead,
+        Perm.eyeManagementUpdate,
+        Perm.eyeMedicinesRead,
+        Perm.eyeMedicinesUpdate,
+        Perm.eyeHistoryRead,
+      ]))
+        const _DrawerItemData(
+          icon: Icons.remove_red_eye_outlined,
+          title: 'Eye Prescription',
+          index: 12,
+        ),
       if (perm.canAny([Perm.vitalsRead, Perm.vitalsCreate]))
         const _DrawerItemData(
           icon: Icons.monitor_heart_outlined,
@@ -325,12 +325,12 @@ class _CustomDrawerState extends State<CustomDrawer> {
                   // Sync Dashboard — removed (offline system removed)
 
                   // Camp Sessions (create/edit/delete/view)
-                  if (perm.canAny([Perm.campSessionCreate, Perm.campSessionUpdate, Perm.campDashboardDelete, Perm.campDashboardRead, Perm.campWebLoginAccess]))
-                    _buildDrawerItem(
-                      icon: Icons.festival_outlined,
-                      title: 'Camp Sessions',
-                      index: 102,
-                    ),
+                  // if (perm.canAny([Perm.campSessionCreate, Perm.campSessionUpdate, Perm.campDashboardDelete, Perm.campDashboardRead, Perm.campWebLoginAccess]))
+                  //   _buildDrawerItem(
+                  //     icon: Icons.festival_outlined,
+                  //     title: 'Camp Sessions',
+                  //     index: 102,
+                  //   ),
 
                   // Complaints Board
                   if (perm.can(Perm.complaintsBoardRead))
@@ -383,36 +383,36 @@ class _CustomDrawerState extends State<CustomDrawer> {
                       ),
                     ),
                   // ── Pharmacy Dropdown ──────────────────────────────────────────────
-                  // if (pharmacyItems.isNotEmpty)
-                  //   _buildGroupHeader(
-                  //     icon: Icons.local_pharmacy_outlined,
-                  //     title: 'Pharmacy',
-                  //     isExpanded: _pharmacyExpanded,
-                  //     hasActiveChild: _pharmacyIndices.contains(
-                  //       widget.selectedIndex,
-                  //     ),
-                  //     onTap: () => setState(
-                  //       () => _pharmacyExpanded = !_pharmacyExpanded,
-                  //     ),
-                  //   ),
-                  // if (_pharmacyExpanded)
-                  //   ...pharmacyItems.map(
-                  //     (item) => _buildSubDrawerItem(
-                  //       icon: item.icon,
-                  //       title: item.title,
-                  //       index: item.index,
-                  //     ),
-                  //   ),
+                  if (pharmacyItems.isNotEmpty)
+                    _buildGroupHeader(
+                      icon: Icons.local_pharmacy_outlined,
+                      title: 'Pharmacy',
+                      isExpanded: _pharmacyExpanded,
+                      hasActiveChild: _pharmacyIndices.contains(
+                        widget.selectedIndex,
+                      ),
+                      onTap: () => setState(
+                        () => _pharmacyExpanded = !_pharmacyExpanded,
+                      ),
+                    ),
+                  if (_pharmacyExpanded)
+                    ...pharmacyItems.map(
+                      (item) => _buildSubDrawerItem(
+                        icon: item.icon,
+                        title: item.title,
+                        index: item.index,
+                      ),
+                    ),
 
                   // Add Expenses — standalone
 
                   // Emergency Treatment — standalone
-                  // if (perm.canAny([Perm.emergencyRead, Perm.emergencyCreate]))
-                  //   _buildDrawerItem(
-                  //     icon: Icons.emergency_rounded,
-                  //     title: 'Emergency Treatment',
-                  //     index: 5,
-                  //   ),
+                  if (perm.canAny([Perm.emergencyRead, Perm.emergencyCreate]))
+                    _buildDrawerItem(
+                      icon: Icons.emergency_rounded,
+                      title: 'Emergency Treatment',
+                      index: 5,
+                    ),
 
                   // ── Reports Dropdown ───────────────────────────────────────
                   if (reportItems.isNotEmpty)

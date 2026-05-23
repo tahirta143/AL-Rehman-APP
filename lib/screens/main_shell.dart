@@ -26,9 +26,9 @@ class _MainShellState extends State<MainShell> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) maybeShowCampJoinPrompt(context);
-    });
+    // WidgetsBinding.instance.addPostFrameCallback((_) {
+    //   if (mounted) maybeShowCampJoinPrompt(context);
+    // });
   }
 
   // The main screens for the bottom navigation

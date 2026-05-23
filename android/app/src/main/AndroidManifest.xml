@@ -4,7 +4,7 @@
     <!-- Allow scanning/connecting USB (OTG) thermal printers -->
     <uses-feature android:name="android.hardware.usb.host" android:required="false" />
     <application
-        android:label="Waseela Diabesity"
+        android:label="Alrehman"
         android:name="${applicationName}"
         android:usesCleartextTraffic="true"
         android:enableOnBackInvokedCallback="true"

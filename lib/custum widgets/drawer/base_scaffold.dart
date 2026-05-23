@@ -376,9 +376,9 @@ class _BaseScaffoldState extends State<BaseScaffold> {
       case 0:
         screen = const dash.DashboardScreen();
         break;
-      case 1:
-        screen = const ConsultationScreen();
-        break;
+      // case 1:
+      //   screen = const ConsultationScreen();
+      //   break;
       case 2:
         screen = const ExpensesScreen();
         break;
@@ -403,9 +403,9 @@ class _BaseScaffoldState extends State<BaseScaffold> {
       case 9:
         screen = const PrescriptionScreen();
         break;
-      // case 12:
-      //   screen = const EyePrescriptionScreen();
-      //   break;
+      case 12:
+        screen = const EyePrescriptionScreen();
+        break;
       case 10:
         screen = const DiscountVoucherApprovalScreen();
         break;
@@ -445,15 +445,15 @@ class _BaseScaffoldState extends State<BaseScaffold> {
       case 23:
         screen = const ComplaintsBoardScreen();
         break;
-      case 100:
-        screen = const SyncDashboardScreen();
-        break;
-      case 101:
-        screen = const OfflineDashboardScreen();
-        break;
-      case 102:
-        screen = const CampDashboardScreen();
-        break;
+      // case 100:
+      //   screen = const SyncDashboardScreen();
+      //   break;
+      // case 101:
+      //   screen = const OfflineDashboardScreen();
+      //   break;
+      // case 102:
+      //   screen = const CampDashboardScreen();
+      //   break;
       case -1:
         _showLogoutDialog(context);
         return;
